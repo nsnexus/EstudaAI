@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EstudaAI - Sincronizador AVA</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo-box">
+        <div class="logo-icon">📚</div>
+        <div>
+          <h1 class="logo-title">Estuda<span>AI</span></h1>
+          <p class="logo-subtitle">Conector AVA Anhanguera</p>
+        </div>
+      </div>
+      <span class="badge-status online" id="serverStatus">Online</span>
+    </header>
+
+    <!-- Info Card -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Portal Conectado</span>
+        <span class="portal-badge" id="portalBadge">AVA KLS</span>
+      </div>
+      <div class="user-info">
+        <div class="avatar" id="userAvatar">🎓</div>
+        <div class="user-details">
+          <p class="user-name" id="userName">Detectando aluno...</p>
+          <p class="user-meta" id="userMeta">Anhanguera Educacional</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions">
+      <button class="btn-sync" id="btnSync">
+        <span class="btn-icon">⚡</span>
+        <span class="btn-text">Sincronizar Disciplinas Agora</span>
+      </button>
+
+      <button class="btn-open" id="btnOpenApp">
+        <span>Abrir EstudaAI (localhost:3002)</span>
+        <span>→</span>
+      </button>
+    </div>
+
+    <!-- Sync Log / Results -->
+    <div class="results" id="resultsBox" style="display: none;">
+      <div class="results-header">
+        <span>Disciplinas Detectadas:</span>
+        <span class="count-badge" id="disciplinesCount">0</span>
+      </div>
+      <ul class="disciplines-list" id="disciplinesList"></ul>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>EstudaAI v1.0 • Aprendizado Socrático</span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

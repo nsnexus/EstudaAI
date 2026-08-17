@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "EstudaAI — Conector AVA Anhanguera",
+  "version": "1.0.0",
+  "description": "Sincroniza suas disciplinas, atividades e prazos do AVA KLS Anhanguera diretamente com o assistente socrático EstudaAI.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.avaeduc.com.br/*",
+    "https://alunodigital.anhanguera.com/*",
+    "http://localhost:*/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "EstudaAI - Sincronizador AVA"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.avaeduc.com.br/*",
+        "https://alunodigital.anhanguera.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
