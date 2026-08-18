@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "EstudaAI — Conector AVA Anhanguera",
+  "name": "EstudaAI - Conector AVA Anhanguera & Kroton",
   "version": "1.0.0",
-  "description": "Sincroniza suas disciplinas, atividades e prazos do AVA KLS Anhanguera diretamente com o assistente socrático EstudaAI.",
+  "description": "Sincronizador automático de disciplinas, atividades e tutor IA para o Portal Anhanguera, Unopar e AVA KLS.",
   "permissions": [
     "activeTab",
     "storage",
@@ -10,21 +10,41 @@
   ],
   "host_permissions": [
     "https://www.avaeduc.com.br/*",
+    "https://*.avaeduc.com.br/*",
     "https://alunodigital.anhanguera.com/*",
-    "http://localhost:*/*"
+    "https://login.anhanguera.com/*",
+    "https://*.unopar.com.br/*",
+    "https://*.pitagoras.com.br/*",
+    "https://estudaai.pages.dev/*",
+    "http://localhost:3000/*"
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "EstudaAI - Sincronizador AVA"
+    "default_title": "EstudaAI - Conector Acadêmico"
+  },
+  "background": {
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {
       "matches": [
         "https://www.avaeduc.com.br/*",
-        "https://alunodigital.anhanguera.com/*"
+        "https://*.avaeduc.com.br/*",
+        "https://alunodigital.anhanguera.com/*",
+        "https://*.unopar.com.br/*",
+        "https://*.pitagoras.com.br/*"
       ],
       "js": ["content.js"],
-      "run_at": "document_idle"
+      "css": ["content.css"],
+      "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "https://estudaai.pages.dev/*",
+        "http://localhost:3000/*"
+      ],
+      "js": ["estudaai-bridge.js"],
+      "run_at": "document_end"
     }
   ]
 }

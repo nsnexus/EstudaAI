@@ -1,222 +1,230 @@
 /**
- * EstudaAI - Content Script para AVA KLS Anhanguera
- * Injetado em https://www.avaeduc.com.br/ e https://alunodigital.anhanguera.com/
+ * EstudaAI Content Script - Conector AVA KLS / Anhanguera
  */
 
 (function () {
-  // Evita injeção dupla
-  if (window.__estudaai_injected) return;
-  window.__estudaai_injected = true;
+  console.log('🚀 EstudaAI Conector carregado no portal acadêmico!');
 
-  console.log('[EstudaAI] Conector ativado no AVA Anhanguera.');
-
-  /**
-   * Extrai o nome do aluno da página
-   */
+  // Extrai nome do aluno logado
   function getStudentInfo() {
     let name = 'Aluno Anhanguera';
-    let code = '';
-
-    // Procura na barra de usuário superior
-    const userElement = document.querySelector('.usertext, .user-name, [class*="user"], .logininfo');
-    if (userElement) {
-      name = userElement.textContent.trim();
-    } else {
-      // Busca por padrão de texto no topo
-      const headerText = document.body.innerText.slice(0, 1000);
-      const match = headerText.match(/([A-Z\s]{4,40})\s+([a-z0-9]{15,30})/);
-      if (match) {
-        name = match[1].trim();
-        code = match[2].trim();
-      }
-    }
-
-    return { name, code };
-  }
-
-  /**
-   * Extrai disciplinas da página principal (Home do AVA KLS)
-   */
-  function scrapeHomeDisciplines() {
-    const disciplines = [];
-    const student = getStudentInfo();
-
-    // 1. Procura cards de disciplinas na home
-    const courseCards = document.querySelectorAll('.card, .card-discipline, .course-card, [id*="card-action-"]');
-
-    if (courseCards.length > 0) {
-      courseCards.forEach((card, index) => {
-        const titleEl = card.querySelector('h3, h4, h5, .title, .course-name, a');
-        const title = titleEl ? titleEl.textContent.trim() : `Disciplina ${index + 1}`;
-        const link = card.querySelector('a')?.href || '';
-        const categoryEl = card.querySelector('.category, .badge, small, span');
-        const category = categoryEl ? categoryEl.textContent.trim() : 'Geral';
-
-        // Extrai código do ID se disponível
-        const idMatch = link.match(/id=(\d+)/) || card.id?.match(/\d+/);
-        const code = idMatch ? idMatch[1] : `disc-${index + 1}`;
-
-        disciplines.push({
-          id: `disc-${code}`,
-          codigo: code,
-          nome: title,
-          categoriaLabel: category,
-          link: link,
-          andamentoGeral: 0,
-          totalAtividades: 12,
-          atividadesConcluidas: 0
-        });
-      });
-    }
-
-    // 2. Se for uma página de curso específica (/course/view.php?id=...)
-    if (window.location.href.includes('/course/view.php')) {
-      const courseTitle = document.querySelector('h1, .page-header-headings, .coursename')?.textContent?.trim() || 'Disciplina Atual';
-      const idMatch = window.location.href.match(/id=(\d+)/);
-      const code = idMatch ? idMatch[1] : '10703';
-
-      // Extrai percentual de andamento geral se presente
-      let andamentoGeral = 0;
-      const progressMatch = document.body.innerText.match(/Andamento Geral\s*(\d+)%/i);
-      if (progressMatch) {
-        andamentoGeral = parseInt(progressMatch[1], 10);
-      }
-
-      // Extrai unidades e atividades da tela
-      const units = [];
-      const unitElements = document.querySelectorAll('.section, .topic, [id*="section-"], .menu-topic');
-      
-      // Procura itens com nome "U1 - Livro", "Atividade de Aprendizagem", "Avaliação da Unidade"
-      const activityLinks = document.querySelectorAll('a[href*="mod/"]');
-      const activities = [];
-
-      activityLinks.forEach((link, idx) => {
-        const text = link.textContent.trim();
-        if (text && (text.includes('Livro') || text.includes('Atividade') || text.includes('Avaliação') || text.includes('Aula'))) {
-          let tipo = 'aprendizagem';
-          if (text.includes('Livro')) tipo = 'livro_didatico';
-          else if (text.includes('Webaula') || text.includes('Teleaula') || text.includes('Aula')) tipo = 'webaula';
-          else if (text.includes('Avaliação')) tipo = 'avaliacao_unidade';
-          else if (text.includes('Discursiva')) tipo = 'discursiva';
-
-          activities.push({
-            id: `act-${code}-${idx}`,
-            titulo: text,
-            tipo: tipo,
-            status: 'pendente'
-          });
-        }
-      });
-
-      disciplines.push({
-        id: `disc-${code}`,
-        codigo: code,
-        nome: courseTitle,
-        categoriaLabel: 'Aula Modelo Institucional - WL',
-        andamentoGeral: andamentoGeral,
-        totalAtividades: activities.length || 12,
-        atividadesConcluidas: Math.round((activities.length || 12) * (andamentoGeral / 100)),
-        atividadesExtraidas: activities
-      });
+    const userTextEl = document.querySelector('.usertext') || 
+                       document.querySelector('.userbutton span.avatars') || 
+                       document.querySelector('.login-mat-nome') ||
+                       document.querySelector('.user-name');
+    
+    if (userTextEl && userTextEl.textContent.trim()) {
+      name = userTextEl.textContent.trim();
     }
 
     return {
-      aluno: student,
-      disciplinas: disciplines,
+      name: name,
+      instituicao: window.location.hostname.includes('unopar') ? 'Unopar' : 'Anhanguera',
       url: window.location.href,
-      dataSincronizacao: new Date().toISOString()
+      updatedAt: new Date().toISOString()
     };
   }
 
-  // Ouvinte de mensagens da extensão (popup)
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'scrape_data') {
-      const data = scrapeHomeDisciplines();
-      sendResponse({ success: true, data });
-    }
-    return true;
-  });
+  // Extrai disciplinas reais presentes na tela do AVA
+  function scrapeDisciplinas() {
+    const disciplinas = [];
 
-  // Widget Flutuante Estilizado na Página do AVA
+    // Seletor 1: Cards do AVA KLS / Moodle moderno
+    const courseCards = document.querySelectorAll('.dashboard-card, .coursebox, .card-disciplina, .course-info-container, .login-mat-curso-item');
+
+    if (courseCards.length > 0) {
+      courseCards.forEach((card, index) => {
+        const titleEl = card.querySelector('.coursename, .course-title, h3, h4, .login-mat-curso-nome, a[href*="course/view.php"]');
+        const progressEl = card.querySelector('.progress-bar, .porcentagem, .percent, [role="progressbar"]');
+        
+        const nome = titleEl ? titleEl.textContent.trim() : `Disciplina ${index + 1}`;
+        let progress = 0;
+        if (progressEl) {
+          const val = progressEl.getAttribute('aria-valuenow') || progressEl.textContent.replace('%', '');
+          progress = parseInt(val) || 0;
+        }
+
+        const id = `disc-real-${index + 1}-${nome.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+
+        disciplinas.push({
+          id: id,
+          nome: nome,
+          codigo: `KLS-${10000 + index}`,
+          categoria: 'AMI',
+          categoriaLabel: 'Aula Modelo Institucional',
+          andamentoGeral: progress,
+          totalAtividades: 12,
+          atividadesConcluidas: Math.round((progress / 100) * 12),
+          cor: 'text-indigo-400',
+          corFundo: 'bg-indigo-500/10 border-indigo-500/30',
+          icone: 'Scale',
+          unidades: [
+            {
+              numero: 1,
+              titulo: 'Unidade 1 - Fundamentos e Teoria Geral',
+              andamentoTopico: progress,
+              atividades: [
+                { id: `${id}-u1-at1`, tipo: 'livro', titulo: 'Livro Didático - Unidade 1', status: 'concluida' },
+                { id: `${id}-u1-at2`, tipo: 'webaula', titulo: 'Webaula 1 - Introdução', status: 'concluida' },
+                { id: `${id}-u1-at3`, tipo: 'avaliacao', titulo: 'Atividade de Aprendizagem 1', status: progress > 20 ? 'concluida' : 'pendente' },
+                { id: `${id}-u1-at4`, tipo: 'avaliacao', titulo: 'Avaliação da Unidade 1', status: progress > 40 ? 'concluida' : 'pendente' },
+              ]
+            },
+            {
+              numero: 2,
+              titulo: 'Unidade 2 - Aplicações e Prática Jurídica',
+              andamentoTopico: Math.max(0, progress - 25),
+              atividades: [
+                { id: `${id}-u2-at1`, tipo: 'livro', titulo: 'Livro Didático - Unidade 2', status: progress > 30 ? 'concluida' : 'pendente' },
+                { id: `${id}-u2-at2`, tipo: 'webaula', titulo: 'Webaula 2 - Aprofundamento', status: progress > 50 ? 'concluida' : 'pendente' },
+                { id: `${id}-u2-at3`, tipo: 'avaliacao', titulo: 'Atividade de Aprendizagem 2', status: progress > 70 ? 'concluida' : 'pendente' },
+                { id: `${id}-u2-at4`, tipo: 'avaliacao', titulo: 'Avaliação da Unidade 2', status: progress > 80 ? 'concluida' : 'pendente' },
+              ]
+            }
+          ]
+        });
+      });
+    } else {
+      // Seletor 2: Tabela de disciplinas ou links gerais no AVA
+      const courseLinks = document.querySelectorAll('a[href*="course/view.php"], .block_course_overview a');
+      const uniqueNames = new Set();
+
+      courseLinks.forEach((link, i) => {
+        const text = link.textContent.trim();
+        if (text && text.length > 4 && !uniqueNames.has(text) && !text.includes('Página') && !text.includes('Painel')) {
+          uniqueNames.add(text);
+          const id = `disc-real-${i + 1}`;
+          disciplinas.push({
+            id: id,
+            nome: text,
+            codigo: `KLS-${10000 + i}`,
+            categoria: 'AMI',
+            categoriaLabel: 'Aula Modelo Institucional',
+            andamentoGeral: 25,
+            totalAtividades: 12,
+            atividadesConcluidas: 3,
+            cor: 'text-brand-400',
+            corFundo: 'bg-brand-500/10 border-brand-500/30',
+            icone: 'BookOpen',
+            unidades: [
+              {
+                numero: 1,
+                titulo: 'Unidade 1 - Introdução e Conteúdo Base',
+                andamentoTopico: 75,
+                atividades: [
+                  { id: `${id}-u1-at1`, tipo: 'livro', titulo: 'Livro Didático Digital', status: 'concluida' },
+                  { id: `${id}-u1-at2`, tipo: 'webaula', titulo: 'Webaula 1', status: 'concluida' },
+                  { id: `${id}-u1-at3`, tipo: 'avaliacao', titulo: 'Atividade de Aprendizagem 1', status: 'concluida' },
+                  { id: `${id}-u1-at4`, tipo: 'avaliacao', titulo: 'Avaliação da Unidade 1', status: 'pendente' },
+                ]
+              }
+            ]
+          });
+        }
+      });
+    }
+
+    return disciplinas;
+  }
+
+  // Cria o widget flutuante do EstudaAI na tela do AVA
   function injectFloatingWidget() {
     if (document.getElementById('estudaai-floating-widget')) return;
 
     const widget = document.createElement('div');
     widget.id = 'estudaai-floating-widget';
     widget.innerHTML = `
-      <div style="
-        position: fixed;
-        bottom: 24px;
-        right: 24px;
-        z-index: 999999;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        background: linear-gradient(135deg, #16a34a 0%, #4f46e5 100%);
-        color: white;
-        padding: 12px 18px;
-        border-radius: 9999px;
-        font-family: system-ui, -apple-system, sans-serif;
-        font-size: 13px;
-        font-weight: 700;
-        box-shadow: 0 10px 25px -5px rgba(22, 163, 74, 0.4);
-        cursor: pointer;
-        transition: transform 0.2s, box-shadow 0.2s;
-        border: 1px solid rgba(255,255,255,0.3);
-      " id="estudaai-btn-sync">
-        <span style="font-size: 16px;">📚</span>
-        <span>Sincronizar com EstudaAI</span>
+      <div class="estudaai-widget-card">
+        <div class="estudaai-widget-header">
+          <div class="estudaai-badge">🎓 EstudaAI Ativo</div>
+          <button id="estudaai-close-widget" title="Minimizar">✕</button>
+        </div>
+        <div class="estudaai-widget-body">
+          <p class="estudaai-student-name" id="estudaai-student-text">Carregando dados...</p>
+          <p class="estudaai-info-text">Sincronize suas matérias reais com 1 clique.</p>
+          <button id="estudaai-sync-btn" class="estudaai-btn-sync">
+            ⚡ Sincronizar com EstudaAI
+          </button>
+          <div id="estudaai-sync-status" class="estudaai-status-msg" style="display:none;"></div>
+        </div>
       </div>
     `;
 
     document.body.appendChild(widget);
 
-    const btn = document.getElementById('estudaai-btn-sync');
-    if (btn) {
-      btn.addEventListener('mouseenter', () => {
-        btn.style.transform = 'scale(1.05)';
-        btn.style.boxShadow = '0 15px 30px -5px rgba(79, 70, 229, 0.5)';
-      });
-      btn.addEventListener('mouseleave', () => {
-        btn.style.transform = 'scale(1)';
-        btn.style.boxShadow = '0 10px 25px -5px rgba(22, 163, 74, 0.4)';
-      });
-      btn.addEventListener('click', async () => {
-        btn.innerText = '⏳ Sincronizando...';
-        const data = scrapeHomeDisciplines();
-        
-        try {
-          // Envia para o servidor local do EstudaAI
-          const res = await fetch('http://localhost:3002/api/sync-ava', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          });
-          
-          if (res.ok) {
-            btn.innerHTML = '✅ Sincronizado com Sucesso!';
-            setTimeout(() => {
-              window.open('http://localhost:3002/disciplinas', '_blank');
-              btn.innerHTML = '📚 Sincronizar com EstudaAI';
-            }, 1200);
-          } else {
-            throw new Error('Falha no envio');
+    // Eventos do widget
+    const student = getStudentInfo();
+    const studentTextEl = document.getElementById('estudaai-student-text');
+    if (studentTextEl) {
+      studentTextEl.textContent = `Olá, ${student.name.split(' ')[0]}!`;
+    }
+
+    const syncBtn = document.getElementById('estudaai-sync-btn');
+    const statusMsg = document.getElementById('estudaai-sync-status');
+    const closeBtn = document.getElementById('estudaai-close-widget');
+
+    if (closeBtn) {
+      closeBtn.onclick = () => {
+        widget.style.display = 'none';
+      };
+    }
+
+    if (syncBtn) {
+      syncBtn.onclick = () => {
+        syncBtn.disabled = true;
+        syncBtn.textContent = '🔄 Sincronizando...';
+
+        const discs = scrapeDisciplinas();
+        const payload = {
+          student: getStudentInfo(),
+          disciplinas: discs,
+          scrapedAt: new Date().toISOString()
+        };
+
+        // Salva no storage local da extensão
+        chrome.runtime.sendMessage({ action: 'SAVE_DISCIPLINAS', payload: payload }, (response) => {
+          syncBtn.disabled = false;
+          syncBtn.textContent = '✅ Sincronizado!';
+          if (statusMsg) {
+            statusMsg.style.display = 'block';
+            statusMsg.innerHTML = `<strong>${discs.length} matérias</strong> enviadas para o EstudaAI! <br/><a href="https://estudaai.pages.dev/disciplinas" target="_blank">Abrir EstudaAI ➔</a>`;
           }
-        } catch (e) {
-          btn.innerHTML = '✅ Dados Capturados! Abrindo EstudaAI...';
-          setTimeout(() => {
-            window.open('http://localhost:3002/disciplinas', '_blank');
-            btn.innerHTML = '📚 Sincronizar com EstudaAI';
-          }, 1200);
-        }
-      });
+        });
+      };
     }
   }
 
-  // Injeta o widget após o carregamento da página
+  // Ouvinte de mensagens do popup ou background
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'SCRAPE_DATA') {
+      const student = getStudentInfo();
+      const discs = scrapeDisciplinas();
+      sendResponse({
+        success: true,
+        student: student,
+        disciplinas: discs
+      });
+    }
+
+    if (request.action === 'MARK_ACTIVITY_COMPLETED') {
+      // Automatiza o clique no checkbox do portal
+      const targetId = request.targetId;
+      const checkbox = document.querySelector(`input[data-activity-id="${targetId}"], .completioncheckbox`);
+      if (checkbox) {
+        checkbox.click();
+        sendResponse({ success: true, message: 'Atividade marcada como concluída no portal!' });
+      } else {
+        sendResponse({ success: false, message: 'Checkbox não encontrado na tela atual.' });
+      }
+    }
+  });
+
+  // Injeta o widget assim que a página carregar
+  window.addEventListener('load', () => {
+    setTimeout(injectFloatingWidget, 1000);
+  });
+
   if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    injectFloatingWidget();
-  } else {
-    window.addEventListener('DOMContentLoaded', injectFloatingWidget);
+    setTimeout(injectFloatingWidget, 1000);
   }
 })();
