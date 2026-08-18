@@ -18,7 +18,7 @@ export async function OPTIONS() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { question, options = [], discipline = 'Direito' } = body;
+    const { question, options = [], discipline = 'Direito', apiKey, provider = 'openai' } = body;
 
     if (!question) {
       return NextResponse.json(
@@ -27,8 +27,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const openaiApiKey = process.env.OPENAI_API_KEY;
-    const geminiApiKey = process.env.GEMINI_API_KEY;
+    const openaiApiKey = (provider === 'openai' && apiKey) ? apiKey : process.env.OPENAI_API_KEY;
+    const geminiApiKey = (provider === 'gemini' && apiKey) ? apiKey : (apiKey?.startsWith('AIza') ? apiKey : process.env.GEMINI_API_KEY);
 
     let solvedResult = {
       correctIndex: 0,
