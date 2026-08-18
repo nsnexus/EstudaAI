@@ -67,6 +67,22 @@ export default function DisciplinasPage() {
   };
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const syncParam = params.get('syncData');
+      if (syncParam) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(syncParam));
+          if (parsed && parsed.disciplinas) {
+            syncPortalData(parsed.student, parsed.disciplinas);
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        } catch (e) {
+          console.error('Erro ao ler syncData da URL:', e);
+        }
+      }
+    }
+
     loadData();
     const handleDiscChange = () => loadData();
     const handleAuthChange = () => setUser(getCurrentUser());
