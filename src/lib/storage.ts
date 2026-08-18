@@ -1,7 +1,7 @@
 'use client';
 
 import { User, StudySession, Flashcard, TutorPersona, AdminMetrics, UserRole, Disciplina } from '@/types';
-import { MOCK_USERS, MOCK_PERSONAS, INITIAL_FLASHCARDS, INITIAL_ADMIN_METRICS, INITIAL_DISCIPLINAS } from './mock-data';
+import { MOCK_PERSONAS, INITIAL_ADMIN_METRICS } from './mock-data';
 
 const STORAGE_KEYS = {
   CURRENT_USER: 'estudaai_current_user',
@@ -28,29 +28,17 @@ function isClient(): boolean {
 }
 
 /**
- * Inicializa os dados no LocalStorage caso ainda não existam
+ * Inicializa os dados no LocalStorage sem forçar mocks de usuário
  */
 export function initStorage() {
   if (!isClient()) return;
 
   if (!localStorage.getItem(STORAGE_KEYS.ALL_USERS)) {
-    localStorage.setItem(STORAGE_KEYS.ALL_USERS, JSON.stringify(MOCK_USERS));
-  }
-
-  if (!localStorage.getItem(STORAGE_KEYS.CURRENT_USER)) {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(MOCK_USERS[0]));
-  }
-
-  if (!localStorage.getItem(STORAGE_KEYS.DISCIPLINAS)) {
-    localStorage.setItem(STORAGE_KEYS.DISCIPLINAS, JSON.stringify(INITIAL_DISCIPLINAS));
+    localStorage.setItem(STORAGE_KEYS.ALL_USERS, JSON.stringify([]));
   }
 
   if (!localStorage.getItem(STORAGE_KEYS.PERSONAS)) {
     localStorage.setItem(STORAGE_KEYS.PERSONAS, JSON.stringify(MOCK_PERSONAS));
-  }
-
-  if (!localStorage.getItem(STORAGE_KEYS.FLASHCARDS)) {
-    localStorage.setItem(STORAGE_KEYS.FLASHCARDS, JSON.stringify(INITIAL_FLASHCARDS));
   }
 
   if (!localStorage.getItem(STORAGE_KEYS.METRICS)) {
@@ -70,7 +58,7 @@ export function initStorage() {
  * Autenticação e Usuários
  */
 export function getCurrentUser(): User | null {
-  if (!isClient()) return MOCK_USERS[0];
+  if (!isClient()) return null;
   initStorage();
   const raw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
   if (!raw) return null;
@@ -92,10 +80,10 @@ export function setCurrentUser(user: User | null): void {
 }
 
 export function getAllUsers(): User[] {
-  if (!isClient()) return MOCK_USERS;
+  if (!isClient()) return [];
   initStorage();
   const raw = localStorage.getItem(STORAGE_KEYS.ALL_USERS);
-  return raw ? JSON.parse(raw) : MOCK_USERS;
+  return raw ? JSON.parse(raw) : [];
 }
 
 export function loginUser(email: string, password?: string): { success: boolean; user?: User; error?: string } {
@@ -110,7 +98,7 @@ export function loginUser(email: string, password?: string): { success: boolean;
     return { success: true, user: found };
   }
 
-  // Se for um novo login rápido
+  // Novo login
   const newUser: User = {
     id: `user-${Date.now()}`,
     name: cleanEmail.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase()),
@@ -194,14 +182,14 @@ export function logoutUser(): void {
  * Gestão e Sincronização de Disciplinas
  */
 export function getDisciplinas(): Disciplina[] {
-  if (!isClient()) return INITIAL_DISCIPLINAS;
+  if (!isClient()) return [];
   initStorage();
   const raw = localStorage.getItem(STORAGE_KEYS.DISCIPLINAS);
-  if (!raw) return INITIAL_DISCIPLINAS;
+  if (!raw) return [];
   try {
     return JSON.parse(raw);
   } catch {
-    return INITIAL_DISCIPLINAS;
+    return [];
   }
 }
 
@@ -314,10 +302,10 @@ export function saveStudySession(session: Omit<StudySession, 'id' | 'createdAt'>
  * Flashcards
  */
 export function getFlashcards(): Flashcard[] {
-  if (!isClient()) return INITIAL_FLASHCARDS;
+  if (!isClient()) return [];
   initStorage();
   const raw = localStorage.getItem(STORAGE_KEYS.FLASHCARDS);
-  return raw ? JSON.parse(raw) : INITIAL_FLASHCARDS;
+  return raw ? JSON.parse(raw) : [];
 }
 
 export function saveFlashcard(card: Omit<Flashcard, 'id' | 'createdAt' | 'mastered' | 'reviewCount'>): Flashcard {

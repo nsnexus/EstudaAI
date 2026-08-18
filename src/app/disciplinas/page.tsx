@@ -393,94 +393,127 @@ export default function DisciplinasPage() {
         </div>
       </div>
 
-      {/* 4. Galeria de Disciplinas (Grid de Cards) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredDisciplinas.map((disciplina) => {
-          const pendentes = disciplina.totalAtividades - disciplina.atividadesConcluidas;
-          const isComplete = disciplina.andamentoGeral === 100;
-
-          return (
-            <div
-              key={disciplina.id}
-              onClick={() => setSelectedDisciplina(disciplina)}
-              className="group relative flex flex-col justify-between rounded-3xl border border-surface-200/80 dark:border-surface-800/80 bg-white dark:bg-surface-900/90 hover:border-brand-500/50 dark:hover:border-brand-500/40 p-6 shadow-sm hover:shadow-xl hover:shadow-brand-500/5 transition-all duration-300 cursor-pointer overflow-hidden"
+      {/* 4. Galeria de Disciplinas (Grid de Cards) ou Empty State */}
+      {disciplinas.length === 0 ? (
+        <div className="rounded-3xl border border-surface-200 dark:border-surface-800 bg-white/80 dark:bg-surface-900/80 p-8 sm:p-12 text-center max-w-2xl mx-auto shadow-sm">
+          <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-brand-500/10 text-brand-600 dark:text-brand-400 mx-auto mb-4 border border-brand-500/20">
+            <GraduationCap className="h-8 w-8" />
+          </div>
+          <h3 className="text-xl font-bold text-surface-900 dark:text-white">
+            Nenhuma disciplina sincronizada ainda
+          </h3>
+          <p className="text-xs sm:text-sm text-surface-500 dark:text-surface-400 mt-2 max-w-md mx-auto">
+            Conecte seu portal acadêmico (Anhanguera, Unopar ou Pitágoras) com seu CPF e senha para mapear suas matérias, unidades e pendências em tempo real.
+          </p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => {
+                setSyncError(null);
+                setSyncSuccess(null);
+                setSyncModalOpen(true);
+              }}
+              className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-brand-600 to-primary-600 hover:from-brand-500 hover:to-primary-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-brand-500/25 active:scale-95 transition-all"
             >
-              {/* Top Row: Icon & Tag */}
-              <div>
-                <div className="flex items-start justify-between gap-3 mb-4">
-                  <div className={`flex h-12 w-12 items-center justify-center rounded-2xl border ${disciplina.corFundo} ${disciplina.cor} group-hover:scale-105 transition-transform`}>
-                    {getDisciplineIcon(disciplina.icone)}
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <span className="rounded-full bg-surface-100 dark:bg-surface-800 px-2.5 py-0.5 text-[10px] font-semibold text-surface-600 dark:text-surface-400 border border-surface-200 dark:border-surface-700">
-                      {disciplina.categoriaLabel}
-                    </span>
-                    {disciplina.codigo && (
-                      <span className="text-[10px] text-surface-400 font-mono mt-0.5">
-                        Cód: {disciplina.codigo}
+              <Zap className="h-4 w-4 text-amber-300" />
+              <span>Conectar e Mapear Portal Acadêmico</span>
+            </button>
+            <Link
+              href="/login"
+              className="flex items-center gap-2 px-5 py-3 rounded-2xl border border-surface-200 dark:border-surface-800 hover:bg-surface-100 dark:hover:bg-surface-800 text-surface-700 dark:text-surface-300 text-xs sm:text-sm font-bold transition-all"
+            >
+              <span>Ir para Tela de Login</span>
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredDisciplinas.map((disciplina) => {
+            const pendentes = disciplina.totalAtividades - disciplina.atividadesConcluidas;
+            const isComplete = disciplina.andamentoGeral === 100;
+
+            return (
+              <div
+                key={disciplina.id}
+                onClick={() => setSelectedDisciplina(disciplina)}
+                className="group relative flex flex-col justify-between rounded-3xl border border-surface-200/80 dark:border-surface-800/80 bg-white dark:bg-surface-900/90 hover:border-brand-500/50 dark:hover:border-brand-500/40 p-6 shadow-sm hover:shadow-xl hover:shadow-brand-500/5 transition-all duration-300 cursor-pointer overflow-hidden"
+              >
+                {/* Top Row: Icon & Tag */}
+                <div>
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-2xl border ${disciplina.corFundo} ${disciplina.cor} group-hover:scale-105 transition-transform`}>
+                      {getDisciplineIcon(disciplina.icone)}
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="rounded-full bg-surface-100 dark:bg-surface-800 px-2.5 py-0.5 text-[10px] font-semibold text-surface-600 dark:text-surface-400 border border-surface-200 dark:border-surface-700">
+                        {disciplina.categoriaLabel}
                       </span>
+                      {disciplina.codigo && (
+                        <span className="text-[10px] text-surface-400 font-mono mt-0.5">
+                          Cód: {disciplina.codigo}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Title */}
+                  <h3 className="text-lg font-bold text-surface-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors line-clamp-2">
+                    {disciplina.nome}
+                  </h3>
+
+                  {/* Units preview */}
+                  <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
+                    {disciplina.unidades.length} {disciplina.unidades.length === 1 ? 'Módulo' : 'Unidades de Ensino'} • {disciplina.totalAtividades} Atividades
+                  </p>
+                </div>
+
+                {/* Progress Section */}
+                <div className="mt-6 pt-4 border-t border-surface-100 dark:border-surface-800">
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <span className="font-medium text-surface-600 dark:text-surface-400">
+                      Conclusão Geral
+                    </span>
+                    <span className="font-bold text-surface-900 dark:text-white">
+                      {disciplina.andamentoGeral}%
+                    </span>
+                  </div>
+
+                  <div className="w-full bg-surface-100 dark:bg-surface-800 h-2.5 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-700 ${
+                        isComplete 
+                          ? 'bg-emerald-500' 
+                          : disciplina.andamentoGeral > 0 
+                            ? 'bg-gradient-to-r from-brand-500 to-primary-500' 
+                            : 'bg-surface-300 dark:bg-surface-700'
+                      }`}
+                      style={{ width: `${Math.max(disciplina.andamentoGeral, 4)}%` }}
+                    />
+                  </div>
+
+                  {/* Pending Status Badge */}
+                  <div className="flex items-center justify-between mt-4">
+                    {pendentes > 0 ? (
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                        <span>{pendentes} {pendentes === 1 ? 'pendência' : 'pendências'}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                        <span>100% Concluída</span>
+                      </div>
                     )}
+
+                    <span className="flex items-center gap-1 text-xs font-bold text-brand-600 dark:text-brand-400 group-hover:translate-x-0.5 transition-transform">
+                      Ver detalhes <ChevronRight className="h-3.5 w-3.5" />
+                    </span>
                   </div>
                 </div>
-
-                {/* Title */}
-                <h3 className="text-lg font-bold text-surface-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors line-clamp-2">
-                  {disciplina.nome}
-                </h3>
-
-                {/* Units preview */}
-                <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
-                  {disciplina.unidades.length} {disciplina.unidades.length === 1 ? 'Módulo' : 'Unidades de Ensino'} • {disciplina.totalAtividades} Atividades
-                </p>
               </div>
-
-              {/* Progress Section */}
-              <div className="mt-6 pt-4 border-t border-surface-100 dark:border-surface-800">
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="font-medium text-surface-600 dark:text-surface-400">
-                    Conclusão Geral
-                  </span>
-                  <span className="font-bold text-surface-900 dark:text-white">
-                    {disciplina.andamentoGeral}%
-                  </span>
-                </div>
-
-                <div className="w-full bg-surface-100 dark:bg-surface-800 h-2.5 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-700 ${
-                      isComplete 
-                        ? 'bg-emerald-500' 
-                        : disciplina.andamentoGeral > 0 
-                          ? 'bg-gradient-to-r from-brand-500 to-primary-500' 
-                          : 'bg-surface-300 dark:bg-surface-700'
-                    }`}
-                    style={{ width: `${Math.max(disciplina.andamentoGeral, 4)}%` }}
-                  />
-                </div>
-
-                {/* Pending Status Badge */}
-                <div className="flex items-center justify-between mt-4">
-                  {pendentes > 0 ? (
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                      <span>{pendentes} {pendentes === 1 ? 'pendência' : 'pendências'}</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
-                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                      <span>100% Concluída</span>
-                    </div>
-                  )}
-
-                  <span className="flex items-center gap-1 text-xs font-bold text-brand-600 dark:text-brand-400 group-hover:translate-x-0.5 transition-transform">
-                    Ver detalhes <ChevronRight className="h-3.5 w-3.5" />
-                  </span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* 5. Painel Detalhado ("O QUE PRECISA SER FEITO AINDA") */}
       {selectedDisciplina && (
