@@ -18,7 +18,14 @@ export async function OPTIONS() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { question, options = [], discipline = 'Direito', apiKey, provider = 'openai' } = body;
+    const { 
+      question, 
+      options = [], 
+      discipline = 'Direito Civil - Contratos', 
+      apiKey, 
+      provider = 'openai',
+      model = 'gpt-4o' // Modelo Flagship GPT-4o completo para precisão máxima
+    } = body;
 
     if (!question) {
       return NextResponse.json(
@@ -37,31 +44,34 @@ export async function POST(req: NextRequest) {
       confidence: 0.95
     };
 
-    const prompt = `Você é um jurista brasileiro de altíssimo nível, professor universitário e especialista em provas e avaliações acadêmicas de ${discipline}.
-Sua missão é acertar com 100% de precisão a alternativa correta da questão abaixo.
+    const prompt = `Você é um jurista e professor de Direito de altíssimo nível (Magistrado/Doutor em Direito pela USP) especializado em bancas examinadoras e avaliações universitárias de ${discipline}.
+Sua missão é atingir 100% de acerto na questão abaixo, analisando cada detalhe e citando as fontes legais (artigos do Código Civil de 2002, Código de Defesa do Consumidor, CLT, CP ou CF/88 e Súmulas do STJ/STF).
 
 ENUNCIADO DA QUESTÃO:
 ${question}
 
-ALTERNATIVAS DISPONÍVEIS:
+ALTERNATIVAS DA QUESTÃO:
 ${options.map((opt: string, i: number) => `[Alternativa ${String.fromCharCode(65 + i)}] ${opt}`).join('\n')}
 
-INSTRUÇÕES CRÍTICAS:
-1. Leia o enunciado com extrema atenção a pegadinhas, exceções da lei e sequências de V ou F (Verdadeiro ou Falso).
-2. Verifique os artigos exatos da legislação brasileira aplicável (Código Civil, CDC, CLT, CP, CF/88, etc.).
-3. Identifique a ÚNICA alternativa correta.
-4. "correctIndex" DEVE ser o índice numérico (0 para A, 1 para B, 2 para C, 3 para D, 4 para E).
-5. "correctLetter" DEVE ser a letra maiúscula ("A", "B", "C", "D" ou "E").
+MÉTODO DE RESOLUÇÃO EXAUSTIVA PASSO A PASSO (Chain of Thought):
+1. ANÁLISE DE CADA ASSERTIVA: Se a questão for de Verdadeiro ou Falso (V/F) ou assertivas (I, II, III, IV), analise cada item individualmente confrontando com o artigo de lei específico.
+2. ELIMINAÇÃO: Demonstre por que cada uma das alternativas incorretas possui vício, erro factual ou divergência com a lei.
+3. CONCLUSÃO INFALÍVEL: Indique a única alternativa que atende com rigor técnico absoluto à pergunta formulada.
+4. ÍNDICES: 
+   - "correctIndex": número exato de 0 a ${Math.max(0, options.length - 1)} (0 para Alternativa A, 1 para B, 2 para C, 3 para D, 4 para E).
+   - "correctLetter": letra correspondente ("A", "B", "C", "D" ou "E").
 
-Responda ESTRITAMENTE em formato JSON com esta estrutura:
+Responda ESTRITAMENTE em formato JSON:
 {
-  "correctIndex": <número de 0 a ${Math.max(0, options.length - 1)}>,
+  "chainOfThought": "<análise detalhada de cada item e artigo de lei correspondente>",
+  "correctIndex": <índice numérico de 0 a ${Math.max(0, options.length - 1)}>,
   "correctLetter": "<A, B, C, D ou E>",
-  "explanation": "<explicação jurídica fundamentada demonstrando por que a alternativa está certa>",
+  "legalSource": "<artigos de lei e doutrina correspondentes>",
+  "explanation": "<justificativa clara e fundamentada nos artigos citados>",
   "confidence": 1.0
 }`;
 
-    // 1. Tenta resolver com OpenAI se houver chave configurada
+    // 1. Resolução com OpenAI (usando GPT-4o completo ou modelo selecionado)
     if (openaiApiKey) {
       try {
         const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -71,11 +81,14 @@ Responda ESTRITAMENTE em formato JSON com esta estrutura:
             'Authorization': `Bearer ${openaiApiKey}`
           },
           body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            temperature: 0.1,
+            model: model || 'gpt-4o', // Usa GPT-4o em vez de mini
+            temperature: 0.0, // Zero aleatoriedade para máxima precisão lógica
             response_format: { type: 'json_object' },
             messages: [
-              { role: 'system', content: 'Você é um jurista e professor que analisa questões de múltipla escolha com rigor técnico e precisão.' },
+              { 
+                role: 'system', 
+                content: 'Você é um jurista renomado e professor universitário de Direito. Você analisa questões com rigor científico absoluto e nunca erra interpretações legais.' 
+              },
               { role: 'user', content: prompt }
             ]
           })
@@ -87,20 +100,22 @@ Responda ESTRITAMENTE em formato JSON com esta estrutura:
           if (typeof parsed.correctIndex === 'number') {
             solvedResult = parsed;
           }
+        } else {
+          console.error('Erro na resposta OpenAI:', await aiRes.text());
         }
       } catch (e) {
-        console.warn('Falha no OpenAI, tentando fallback:', e);
+        console.warn('Falha no OpenAI:', e);
       }
     } 
-    // 2. Tenta resolver com Google Gemini se houver chave configurada
+    // 2. Fallback com Google Gemini 1.5 Pro
     else if (geminiApiKey) {
       try {
-        const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
+        const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiApiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: 'application/json', temperature: 0.1 }
+            generationConfig: { responseMimeType: 'application/json', temperature: 0.0 }
           })
         });
 
@@ -117,32 +132,6 @@ Responda ESTRITAMENTE em formato JSON com esta estrutura:
       } catch (e) {
         console.warn('Falha no Gemini:', e);
       }
-    } else {
-      // Análise heurística inteligente caso a chave não esteja no ambiente
-      let bestIdx = 0;
-      let maxScore = -1;
-
-      options.forEach((opt: string, idx: number) => {
-        const lower = opt.toLowerCase();
-        let score = opt.length;
-        if (lower.includes('correto') || lower.includes('boa-fé') || lower.includes('constitucional') || lower.includes('legalidade')) {
-          score += 50;
-        }
-        if (lower.includes('apenas') || lower.includes('nunca') || lower.includes('sempre')) {
-          score -= 20;
-        }
-        if (score > maxScore) {
-          maxScore = score;
-          bestIdx = idx;
-        }
-      });
-
-      solvedResult = {
-        correctIndex: bestIdx,
-        correctLetter: String.fromCharCode(65 + bestIdx),
-        explanation: 'Alternativa mais completa e juridicamente coerente com os princípios de ' + discipline,
-        confidence: 0.92
-      };
     }
 
     return NextResponse.json(
