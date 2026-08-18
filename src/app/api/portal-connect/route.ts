@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Disciplina } from '@/types';
 import { INITIAL_DISCIPLINAS } from '@/lib/mock-data';
 
+export const runtime = 'edge';
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();

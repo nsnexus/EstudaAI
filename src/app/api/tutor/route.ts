@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkInputIntegrity, sanitizeTutorOutput, BASE_TUTOR_SYSTEM_PROMPT } from '@/lib/integrity-filter';
 
+export const runtime = 'edge';
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
