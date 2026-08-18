@@ -46,15 +46,15 @@ export const INITIAL_DISCIPLINAS: Disciplina[] = [
     icone: 'Scale',
     cor: 'text-amber-600 dark:text-amber-400',
     corFundo: 'bg-amber-500/10 border-amber-500/20',
-    andamentoGeral: 25,
+    andamentoGeral: 0,
     totalAtividades: 12,
-    atividadesConcluidas: 3,
+    atividadesConcluidas: 0,
     proximoPrazo: '10 de Agosto de 2026',
     unidades: [
       {
         numero: 1,
         titulo: 'Unidade 1: Teoria Geral dos Contratos e Princípios Fundamentais',
-        andamentoTopico: 75,
+        andamentoTopico: 0,
         dataLiberacao: '10 de agosto de 2026',
         atividades: [
           {
@@ -62,7 +62,7 @@ export const INITIAL_DISCIPLINAS: Disciplina[] = [
             unidadeNumero: 1,
             titulo: 'U1 - Livro Didático (Teoria Geral e Formação dos Contratos)',
             tipo: 'livro_didatico',
-            status: 'concluida',
+            status: 'pendente',
             descricao: 'Capítulo 1 e 2: Autonomia privada, boa-fé objetiva e função social do contrato.',
             pontuacaoMaxima: 0,
             pontuacaoObtida: 0
@@ -72,7 +72,7 @@ export const INITIAL_DISCIPLINAS: Disciplina[] = [
             unidadeNumero: 1,
             titulo: 'U1 - Webaula e Teleaula',
             tipo: 'webaula',
-            status: 'concluida',
+            status: 'pendente',
             descricao: 'Vídeos explicativos e estudos de caso sobre vícios de consentimento.',
             pontuacaoMaxima: 0,
             pontuacaoObtida: 0
@@ -82,7 +82,7 @@ export const INITIAL_DISCIPLINAS: Disciplina[] = [
             unidadeNumero: 1,
             titulo: 'U1 - Atividade de Aprendizagem',
             tipo: 'aprendizagem',
-            status: 'concluida',
+            status: 'pendente',
             descricao: 'Exercícios de fixação sobre princípios contratuais modernos.',
             prazo: '15/09/2026',
             pontuacaoMaxima: 200,
@@ -218,22 +218,22 @@ export const INITIAL_DISCIPLINAS: Disciplina[] = [
     icone: 'Shield',
     cor: 'text-red-600 dark:text-red-400',
     corFundo: 'bg-red-500/10 border-red-500/20',
-    andamentoGeral: 8,
+    andamentoGeral: 0,
     totalAtividades: 12,
-    atividadesConcluidas: 1,
+    atividadesConcluidas: 0,
     proximoPrazo: '16 de Agosto de 2026',
     unidades: [
       {
         numero: 1,
         titulo: 'Unidade 1: Princípios Penais e Teoria do Crime (Fato Típico)',
-        andamentoTopico: 25,
+        andamentoTopico: 0,
         atividades: [
           {
             id: 'act-dp-u1-livro',
             unidadeNumero: 1,
             titulo: 'U1 - Livro Didático (Fato Típico, Conduta e Dolo/Culpa)',
             tipo: 'livro_didatico',
-            status: 'concluida',
+            status: 'pendente',
             descricao: 'Teoria analítica do crime e critérios de imputação objetiva.'
           },
           {
@@ -658,22 +658,22 @@ export const INITIAL_DISCIPLINAS: Disciplina[] = [
     icone: 'GraduationCap',
     cor: 'text-purple-600 dark:text-purple-400',
     corFundo: 'bg-purple-500/10 border-purple-500/20',
-    andamentoGeral: 10,
+    andamentoGeral: 0,
     totalAtividades: 4,
-    atividadesConcluidas: 1,
+    atividadesConcluidas: 0,
     proximoPrazo: '15 de Outubro de 2026',
     unidades: [
       {
         numero: 1,
         titulo: 'Módulos do Projeto: Planejamento PDCA e Execução Comunitária',
-        andamentoTopico: 25,
+        andamentoTopico: 0,
         atividades: [
           {
             id: 'act-pe-1',
             unidadeNumero: 1,
             titulo: 'Template PDCA de Planejamento da Ação Extensionista',
             tipo: 'discursiva',
-            status: 'concluida',
+            status: 'pendente',
             descricao: 'Definição do público-alvo, objetivo ODS da ONU e cronograma de campo.'
           },
           {
@@ -698,22 +698,22 @@ export const INITIAL_DISCIPLINAS: Disciplina[] = [
     icone: 'Sparkles',
     cor: 'text-teal-600 dark:text-teal-400',
     corFundo: 'bg-teal-500/10 border-teal-500/20',
-    andamentoGeral: 50,
+    andamentoGeral: 0,
     totalAtividades: 4,
-    atividadesConcluidas: 2,
+    atividadesConcluidas: 0,
     proximoPrazo: '15 de Novembro de 2026',
     unidades: [
       {
         numero: 1,
         titulo: 'Módulo: Inteligência Emocional, Ética e Carreira',
-        andamentoTopico: 50,
+        andamentoTopico: 0,
         atividades: [
           {
             id: 'act-cv-1',
             unidadeNumero: 1,
             titulo: 'Trilha de Aprendizagem: Autogestão e Comunicação Não Violenta',
             tipo: 'webaula',
-            status: 'concluida'
+            status: 'pendente'
           },
           {
             id: 'act-cv-2',
