@@ -132,32 +132,32 @@ export default function DisciplinasPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           instituicao,
-          cpfMatricula,
+          cpfMatricula: cpfMatricula.trim(),
           senha: senhaPortal
         })
       });
 
       const data = await res.json();
 
+      if (!res.ok || !data.success) {
+        setIsSyncing(false);
+        setSyncStep(0);
+        setSyncError(data.error || 'Credenciais inválidas no portal acadêmico.');
+        return;
+      }
+
+      setSyncStep(3);
+      setSyncStepText(`✅ ${data.totalDisciplinas} disciplinas sincronizadas!`);
+      
+      syncPortalData(data.aluno, data.disciplinas);
+      loadData();
+      setSyncSuccess(`Sincronização concluída com sucesso!`);
+      
       setTimeout(() => {
         setIsSyncing(false);
-        if (data.success) {
-          setSyncStep(5);
-          setSyncStepText(`✅ ${data.totalDisciplinas} disciplinas mapeadas com sucesso!`);
-          
-          syncPortalData(data.aluno, data.disciplinas);
-          loadData();
-          setSyncSuccess(`Sincronização concluída com sucesso! ${data.totalDisciplinas} disciplinas atualizadas.`);
-          
-          setTimeout(() => {
-            setSyncModalOpen(false);
-            setSyncSuccess(null);
-          }, 1500);
-        } else {
-          setSyncStep(0);
-          setSyncError(data.error || 'Erro na sincronização.');
-        }
-      }, 2400);
+        setSyncModalOpen(false);
+        setSyncSuccess(null);
+      }, 1200);
 
     } catch (err) {
       setIsSyncing(false);

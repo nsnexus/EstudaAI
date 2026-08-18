@@ -54,57 +54,44 @@ export default function LoginPage() {
 
     setIsLoading(true);
     setSyncStep(1);
-    setSyncStepText(`1. Conectando aos servidores seguros da ${instituicao}...`);
+    setSyncStepText(`1. Verificando credenciais nos servidores da ${instituicao}...`);
 
     try {
-      setTimeout(() => {
-        setSyncStep(2);
-        setSyncStepText('2. Autenticando credenciais no AVA KLS...');
-      }, 700);
-
-      setTimeout(() => {
-        setSyncStep(3);
-        setSyncStepText('3. Mapeando disciplinas matriculadas e unidades...');
-      }, 1400);
-
-      setTimeout(() => {
-        setSyncStep(4);
-        setSyncStepText('4. Identificando avaliações e atividades pendentes...');
-      }, 2100);
-
       const res = await fetch('/api/portal-connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           instituicao,
-          cpfMatricula,
+          cpfMatricula: cpfMatricula.trim(),
           senha: senhaPortal
         })
       });
 
       const data = await res.json();
 
-      setTimeout(() => {
+      if (!res.ok || !data.success) {
         setIsLoading(false);
-        if (data.success) {
-          setSyncStep(5);
-          setSyncStepText(`✅ ${data.totalDisciplinas} disciplinas mapeadas com sucesso!`);
-          
-          // Salva dados no storage
-          syncPortalData(data.aluno, data.disciplinas);
-          
-          setSuccessMsg(`Bem-vindo(a), ${data.aluno.name}! Redirecionando para seu painel...`);
-          setTimeout(() => router.push('/disciplinas'), 900);
-        } else {
-          setSyncStep(0);
-          setError(data.error || 'Erro ao conectar ao portal.');
-        }
-      }, 2800);
+        setSyncStep(0);
+        setError(data.error || 'Credenciais inválidas no portal acadêmico. Verifique seu login e senha.');
+        return;
+      }
+
+      // Se autenticado com sucesso na faculdade
+      setSyncStep(2);
+      setSyncStepText('2. Autenticado com sucesso! Mapeando disciplinas...');
+
+      setTimeout(() => {
+        setSyncStep(3);
+        setSyncStepText(`✅ ${data.totalDisciplinas} disciplinas mapeadas! Redirecionando...`);
+        syncPortalData(data.aluno, data.disciplinas);
+        setSuccessMsg(`Bem-vindo(a), ${data.aluno.name}!`);
+        setTimeout(() => router.push('/disciplinas'), 600);
+      }, 700);
 
     } catch (err) {
       setIsLoading(false);
       setSyncStep(0);
-      setError('Falha ao conectar com o servidor. Tente novamente.');
+      setError('Falha de conexão com os servidores da instituição. Tente novamente.');
     }
   };
 
@@ -213,7 +200,7 @@ export default function LoginPage() {
 
           {/* Feedback messages */}
           {error && (
-            <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs sm:text-sm text-red-600 dark:text-red-400">
+            <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-red-500/30 bg-red-500/10 p-3.5 text-xs sm:text-sm text-red-600 dark:text-red-400">
               <AlertCircle className="h-4 w-4 shrink-0" />
               <span>{error}</span>
             </div>
@@ -269,7 +256,7 @@ export default function LoginPage() {
                     type="text"
                     value={cpfMatricula}
                     onChange={(e) => setCpfMatricula(e.target.value)}
-                    placeholder="Ex: 015.432.300-00 ou Matrícula"
+                    placeholder="Ex: 01543230000 ou Matrícula"
                     disabled={isLoading}
                     className="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/50 pl-10 pr-4 py-2.5 text-sm text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all disabled:opacity-50"
                   />
@@ -294,7 +281,7 @@ export default function LoginPage() {
                 </div>
                 <p className="text-[11px] text-surface-400 mt-1 flex items-center gap-1">
                   <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                  Conexão segura direta para mapeamento das suas disciplinas.
+                  Validação direta em tempo real com os servidores da instituição.
                 </p>
               </div>
 
@@ -303,15 +290,12 @@ export default function LoginPage() {
                 <div className="p-3.5 rounded-2xl bg-surface-100/80 dark:bg-surface-800/60 border border-surface-200 dark:border-surface-700 space-y-2 animate-in fade-in">
                   <div className="flex items-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
                     <Loader2 className="h-4 w-4 animate-spin text-brand-500" />
-                    <span>Mapeando seu Portal Acadêmico...</span>
+                    <span>{syncStepText}</span>
                   </div>
-                  <p className="text-xs text-surface-600 dark:text-surface-300 font-medium">
-                    {syncStepText}
-                  </p>
                   <div className="w-full bg-surface-200 dark:bg-surface-700 h-1.5 rounded-full overflow-hidden">
                     <div 
-                      className="bg-brand-500 h-full rounded-full transition-all duration-500"
-                      style={{ width: `${(syncStep / 4) * 100}%` }}
+                      className="bg-brand-500 h-full rounded-full transition-all duration-300"
+                      style={{ width: `${(syncStep / 3) * 100}%` }}
                     />
                   </div>
                 </div>
@@ -326,7 +310,7 @@ export default function LoginPage() {
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Mapeando Disciplinas...</span>
+                    <span>Conectando com o Portal...</span>
                   </>
                 ) : (
                   <>
