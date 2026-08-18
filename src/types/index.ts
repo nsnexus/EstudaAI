@@ -33,6 +33,7 @@ export interface AtividadeDisciplina {
   linkTexto?: string;
   instrucao?: string;
   questoesDisponiveis?: number;
+  dataConclusao?: string;
 }
 
 export interface UnidadeEnsino {

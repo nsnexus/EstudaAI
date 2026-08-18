@@ -16,7 +16,7 @@ const STORAGE_KEYS = {
 };
 
 export interface AIConfig {
-  provider: 'mock' | 'openai' | 'gemini';
+  provider: 'openai' | 'gemini';
   openaiApiKey?: string;
   geminiApiKey?: string;
   openaiModel?: string;
@@ -59,7 +59,7 @@ export function initStorage() {
 
   if (!localStorage.getItem(STORAGE_KEYS.AI_CONFIG)) {
     const defaultConfig: AIConfig = {
-      provider: 'mock',
+      provider: 'openai',
       openaiModel: 'gpt-4o-mini',
     };
     localStorage.setItem(STORAGE_KEYS.AI_CONFIG, JSON.stringify(defaultConfig));
@@ -144,7 +144,7 @@ export function registerUser(name: string, email: string, course: string, semest
     name: name.trim(),
     email: cleanEmail,
     role,
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     course: course.trim() || 'Direito',
     semester: semester || 1,
     studyGoalMinutes: 45,
@@ -157,121 +157,136 @@ export function registerUser(name: string, email: string, course: string, semest
   return { success: true, user: newUser };
 }
 
+export function switchRole(role: UserRole): User | null {
+  const current = getCurrentUser();
+  if (current) {
+    const updated: User = { ...current, role };
+    updateUser(updated);
+    return updated;
+  }
+  return null;
+}
+
+export function updateUser(user: User): void {
+  if (!isClient()) return;
+  initStorage();
+  const users = getAllUsers();
+  const idx = users.findIndex(u => u.id === user.id);
+  if (idx !== -1) {
+    users[idx] = user;
+  } else {
+    users.push(user);
+  }
+  localStorage.setItem(STORAGE_KEYS.ALL_USERS, JSON.stringify(users));
+  
+  const current = getCurrentUser();
+  if (current && current.id === user.id) {
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+  }
+  window.dispatchEvent(new Event('estudaai_auth_changed'));
+}
+
 export function logoutUser(): void {
   setCurrentUser(null);
 }
 
-export function switchRole(role: UserRole): User {
-  const users = getAllUsers();
-  const targetUser = users.find(u => u.role === role) || users[0];
-  setCurrentUser(targetUser);
-  return targetUser;
-}
-
-export function updateUser(updated: User): void {
-  if (!isClient()) return;
-  const users = getAllUsers();
-  const index = users.findIndex(u => u.id === updated.id);
-  if (index !== -1) {
-    users[index] = updated;
-    localStorage.setItem(STORAGE_KEYS.ALL_USERS, JSON.stringify(users));
-    const current = getCurrentUser();
-    if (current && current.id === updated.id) {
-      setCurrentUser(updated);
-    }
-  }
-}
-
 /**
- * Gerenciamento de Disciplinas e Atividades
+ * Gestão e Sincronização de Disciplinas
  */
 export function getDisciplinas(): Disciplina[] {
   if (!isClient()) return INITIAL_DISCIPLINAS;
   initStorage();
   const raw = localStorage.getItem(STORAGE_KEYS.DISCIPLINAS);
-  return raw ? JSON.parse(raw) : INITIAL_DISCIPLINAS;
-}
-
-export function getDisciplinaById(id: string): Disciplina | undefined {
-  const disciplinas = getDisciplinas();
-  return disciplinas.find(d => d.id === id);
-}
-
-export function toggleAtividadeConcluida(disciplinaId: string, atividadeId: string): Disciplina | undefined {
-  if (!isClient()) return undefined;
-  const disciplinas = getDisciplinas();
-  const disciplina = disciplinas.find(d => d.id === disciplinaId);
-  if (!disciplina) return undefined;
-
-  let totalActs = 0;
-  let concluidas = 0;
-
-  for (const unidade of disciplina.unidades) {
-    let uTotal = unidade.atividades.length;
-    let uConcluidas = 0;
-
-    for (const atv of unidade.atividades) {
-      if (atv.id === atividadeId) {
-        atv.status = atv.status === 'concluida' ? 'pendente' : 'concluida';
-      }
-      if (atv.status === 'concluida') {
-        uConcluidas++;
-        concluidas++;
-      }
-      totalActs++;
-    }
-
-    unidade.andamentoTopico = uTotal > 0 ? Math.round((uConcluidas / uTotal) * 100) : 0;
+  if (!raw) return INITIAL_DISCIPLINAS;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return INITIAL_DISCIPLINAS;
   }
+}
 
-  disciplina.totalAtividades = totalActs;
-  disciplina.atividadesConcluidas = concluidas;
-  disciplina.andamentoGeral = totalActs > 0 ? Math.round((concluidas / totalActs) * 100) : 0;
-
+export function saveDisciplinas(disciplinas: Disciplina[]): void {
+  if (!isClient()) return;
   localStorage.setItem(STORAGE_KEYS.DISCIPLINAS, JSON.stringify(disciplinas));
   window.dispatchEvent(new Event('estudaai_disciplinas_changed'));
-  return disciplina;
 }
 
-export function syncPortalData(alunoData: Partial<User>, novasDisciplinas?: Disciplina[]): User {
-  if (!isClient()) return MOCK_USERS[0];
+export function toggleAtividadeConcluida(disciplinaId: string, atividadeId: string): Disciplina | null {
+  if (!isClient()) return null;
+  const list = getDisciplinas();
+  const discIndex = list.findIndex(d => d.id === disciplinaId);
+  if (discIndex === -1) return null;
+
+  const disc = list[discIndex];
+  let updated = false;
+
+  for (const unidade of disc.unidades) {
+    const atv = unidade.atividades.find(a => a.id === atividadeId);
+    if (atv) {
+      atv.status = atv.status === 'concluida' ? 'pendente' : 'concluida';
+      atv.dataConclusao = atv.status === 'concluida' ? new Date().toISOString() : undefined;
+      updated = true;
+      break;
+    }
+  }
+
+  if (!updated) return null;
+
+  // Recalcula totais e percentuais
+  let total = 0;
+  let concluidas = 0;
+
+  disc.unidades.forEach(u => {
+    const uTotal = u.atividades.length;
+    const uConcluidas = u.atividades.filter(a => a.status === 'concluida').length;
+    u.andamentoTopico = uTotal > 0 ? Math.round((uConcluidas / uTotal) * 100) : 0;
+
+    total += uTotal;
+    concluidas += uConcluidas;
+  });
+
+  disc.totalAtividades = total;
+  disc.atividadesConcluidas = concluidas;
+  disc.andamentoGeral = total > 0 ? Math.round((concluidas / total) * 100) : 0;
+
+  list[discIndex] = disc;
+  saveDisciplinas(list);
+  return disc;
+}
+
+export function syncPortalData(aluno: any, disciplinas: Disciplina[]): void {
+  if (!isClient()) return;
   initStorage();
 
-  const users = getAllUsers();
-  let user = users.find(u => u.email === alunoData.email || u.name === alunoData.name);
+  if (disciplinas && Array.isArray(disciplinas)) {
+    saveDisciplinas(disciplinas);
+  }
 
-  if (!user) {
-    user = {
-      id: `user-${Date.now()}`,
-      name: alunoData.name || 'Aluno Conectado',
-      email: alunoData.email || `aluno.${Date.now()}@anhanguera.edu.br`,
+  if (aluno) {
+    const users = getAllUsers();
+    let existing = users.find(u => u.id === aluno.id || u.email === aluno.email);
+    const userToSave: User = {
+      id: aluno.id || `user-${Date.now()}`,
+      name: aluno.name,
+      email: aluno.email,
       role: 'aluno',
-      avatar: alunoData.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-      course: alunoData.course || 'Direito',
-      semester: alunoData.semester || 5,
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      course: aluno.course || 'Direito',
+      semester: aluno.semester || 5,
       studyGoalMinutes: 60,
       createdAt: new Date().toISOString()
     };
-    users.push(user);
-    localStorage.setItem(STORAGE_KEYS.ALL_USERS, JSON.stringify(users));
-  } else {
-    if (alunoData.course) user.course = alunoData.course;
-    if (alunoData.semester) user.semester = alunoData.semester;
-    updateUser(user);
+
+    if (!existing) {
+      users.push(userToSave);
+      localStorage.setItem(STORAGE_KEYS.ALL_USERS, JSON.stringify(users));
+    }
+    setCurrentUser(userToSave);
   }
-
-  setCurrentUser(user);
-
-  if (novasDisciplinas && novasDisciplinas.length > 0) {
-    localStorage.setItem(STORAGE_KEYS.DISCIPLINAS, JSON.stringify(novasDisciplinas));
-    window.dispatchEvent(new Event('estudaai_disciplinas_changed'));
-  }
-
-  return user;
 }
 
 /**
- * Gerenciamento de Sessões de Estudo / Dúvidas
+ * Sessões de Estudo & Histórico
  */
 export function getStudySessions(): StudySession[] {
   if (!isClient()) return [];
@@ -280,26 +295,23 @@ export function getStudySessions(): StudySession[] {
   return raw ? JSON.parse(raw) : [];
 }
 
-export function saveStudySession(session: StudySession): void {
-  if (!isClient()) return;
+export function saveStudySession(session: Omit<StudySession, 'id' | 'createdAt'>): StudySession {
   const sessions = getStudySessions();
-  const index = sessions.findIndex(s => s.id === session.id);
-  if (index !== -1) {
-    sessions[index] = session;
-  } else {
-    sessions.unshift(session);
+  const newSession: StudySession = {
+    ...session,
+    id: `session-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+  };
+  sessions.unshift(newSession);
+  if (isClient()) {
+    localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
+    window.dispatchEvent(new Event('estudaai_sessions_changed'));
   }
-  localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
-  window.dispatchEvent(new Event('estudaai_sessions_changed'));
-}
-
-export function getStudySessionById(id: string): StudySession | undefined {
-  const sessions = getStudySessions();
-  return sessions.find(s => s.id === id);
+  return newSession;
 }
 
 /**
- * Gerenciamento de Flashcards
+ * Flashcards
  */
 export function getFlashcards(): Flashcard[] {
   if (!isClient()) return INITIAL_FLASHCARDS;
@@ -308,42 +320,49 @@ export function getFlashcards(): Flashcard[] {
   return raw ? JSON.parse(raw) : INITIAL_FLASHCARDS;
 }
 
-export function saveFlashcard(card: Flashcard): void {
-  if (!isClient()) return;
+export function saveFlashcard(card: Omit<Flashcard, 'id' | 'createdAt' | 'mastered' | 'reviewCount'>): Flashcard {
   const cards = getFlashcards();
-  const index = cards.findIndex(c => c.id === card.id);
-  if (index !== -1) {
-    cards[index] = card;
-  } else {
-    cards.unshift(card);
+  const newCard: Flashcard = {
+    ...card,
+    id: `card-${Date.now()}`,
+    mastered: false,
+    reviewCount: 0,
+    createdAt: new Date().toISOString(),
+  };
+  cards.unshift(newCard);
+  if (isClient()) {
+    localStorage.setItem(STORAGE_KEYS.FLASHCARDS, JSON.stringify(cards));
+    window.dispatchEvent(new Event('estudaai_flashcards_changed'));
   }
-  localStorage.setItem(STORAGE_KEYS.FLASHCARDS, JSON.stringify(cards));
-  window.dispatchEvent(new Event('estudaai_flashcards_changed'));
+  return newCard;
 }
 
 export function toggleFlashcardMastery(id: string): boolean {
   const cards = getFlashcards();
-  const card = cards.find(c => c.id === id);
+  const card = cards.find((c) => c.id === id);
   if (card) {
     card.mastered = !card.mastered;
-    card.reviewCount = (card.reviewCount || 0) + 1;
+    card.reviewCount += 1;
     card.lastReviewed = new Date().toISOString();
-    localStorage.setItem(STORAGE_KEYS.FLASHCARDS, JSON.stringify(cards));
-    window.dispatchEvent(new Event('estudaai_flashcards_changed'));
+    if (isClient()) {
+      localStorage.setItem(STORAGE_KEYS.FLASHCARDS, JSON.stringify(cards));
+      window.dispatchEvent(new Event('estudaai_flashcards_changed'));
+    }
     return card.mastered;
   }
   return false;
 }
 
 export function deleteFlashcard(id: string): void {
-  if (!isClient()) return;
-  const cards = getFlashcards().filter(c => c.id !== id);
-  localStorage.setItem(STORAGE_KEYS.FLASHCARDS, JSON.stringify(cards));
-  window.dispatchEvent(new Event('estudaai_flashcards_changed'));
+  const cards = getFlashcards().filter((c) => c.id !== id);
+  if (isClient()) {
+    localStorage.setItem(STORAGE_KEYS.FLASHCARDS, JSON.stringify(cards));
+    window.dispatchEvent(new Event('estudaai_flashcards_changed'));
+  }
 }
 
 /**
- * Personas de Tutores
+ * Personas de Tutoria
  */
 export function getTutorPersonas(): TutorPersona[] {
   if (!isClient()) return MOCK_PERSONAS;
@@ -353,18 +372,19 @@ export function getTutorPersonas(): TutorPersona[] {
 }
 
 export function updateTutorPersona(persona: TutorPersona): void {
-  if (!isClient()) return;
   const personas = getTutorPersonas();
-  const index = personas.findIndex(p => p.id === persona.id);
-  if (index !== -1) {
-    personas[index] = persona;
-    localStorage.setItem(STORAGE_KEYS.PERSONAS, JSON.stringify(personas));
-    window.dispatchEvent(new Event('estudaai_personas_changed'));
+  const idx = personas.findIndex((p) => p.id === persona.id);
+  if (idx !== -1) {
+    personas[idx] = persona;
+    if (isClient()) {
+      localStorage.setItem(STORAGE_KEYS.PERSONAS, JSON.stringify(personas));
+      window.dispatchEvent(new Event('estudaai_personas_changed'));
+    }
   }
 }
 
 /**
- * Métricas do Administrador
+ * Métricas Administrativas & Integridade
  */
 export function getAdminMetrics(): AdminMetrics {
   if (!isClient()) return INITIAL_ADMIN_METRICS;
@@ -373,18 +393,20 @@ export function getAdminMetrics(): AdminMetrics {
   return raw ? JSON.parse(raw) : INITIAL_ADMIN_METRICS;
 }
 
-export function recordIntegrityIntervention(studentName: string, discipline: string, querySnippet: string): void {
+export function recordIntegrityIntervention(userName?: string, discipline?: string, query?: string): void {
   if (!isClient()) return;
   const metrics = getAdminMetrics();
   metrics.integrityBlocksCount += 1;
-  metrics.recentIntegrityLogs.unshift({
-    id: `log-${Date.now()}`,
-    studentName,
-    discipline,
-    querySnippet,
-    intervention: 'Intervenção Socrática: bloqueio de gabarito direto e redirecionamento para reflexão.',
-    timestamp: 'Agora mesmo'
-  });
+  if (userName && query) {
+    metrics.recentIntegrityLogs.unshift({
+      id: `log-${Date.now()}`,
+      studentName: userName,
+      discipline: discipline || 'Geral',
+      querySnippet: query.slice(0, 80),
+      intervention: 'Redirecionamento Socrático (Anti-Gabarito)',
+      timestamp: new Date().toISOString()
+    });
+  }
   localStorage.setItem(STORAGE_KEYS.METRICS, JSON.stringify(metrics));
 }
 
@@ -392,10 +414,10 @@ export function recordIntegrityIntervention(studentName: string, discipline: str
  * Configurações de IA
  */
 export function getAIConfig(): AIConfig {
-  if (!isClient()) return { provider: 'mock' };
+  if (!isClient()) return { provider: 'openai', openaiModel: 'gpt-4o-mini' };
   initStorage();
   const raw = localStorage.getItem(STORAGE_KEYS.AI_CONFIG);
-  return raw ? JSON.parse(raw) : { provider: 'mock' };
+  return raw ? JSON.parse(raw) : { provider: 'openai', openaiModel: 'gpt-4o-mini' };
 }
 
 export function saveAIConfig(config: AIConfig): void {

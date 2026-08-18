@@ -10,19 +10,12 @@ import {
   User as UserIcon, 
   ArrowRight, 
   ShieldCheck, 
-  BookOpen, 
-  Sparkles,
-  CheckCircle2,
   AlertCircle,
-  Building2,
+  CheckCircle2,
   Zap,
-  Loader2,
-  Check,
-  Search,
-  RefreshCw
+  Loader2
 } from 'lucide-react';
-import { loginUser, registerUser, getAllUsers, setCurrentUser, syncPortalData } from '@/lib/storage';
-import { User } from '@/types';
+import { loginUser, registerUser, syncPortalData } from '@/lib/storage';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -49,8 +42,6 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  const mockUsers = getAllUsers();
 
   const handlePortalConnectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,12 +148,6 @@ export default function LoginPage() {
         setError(res.error || 'Erro ao criar conta.');
       }
     }, 400);
-  };
-
-  const handleQuickLogin = (user: User) => {
-    setCurrentUser(user);
-    setSuccessMsg(`Conectado como ${user.name}!`);
-    setTimeout(() => router.push('/disciplinas'), 400);
   };
 
   return (
@@ -309,7 +294,7 @@ export default function LoginPage() {
                 </div>
                 <p className="text-[11px] text-surface-400 mt-1 flex items-center gap-1">
                   <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                  Conexão segura direta para mapeamento automático das suas disciplinas.
+                  Conexão segura direta para mapeamento das suas disciplinas.
                 </p>
               </div>
 
@@ -472,43 +457,6 @@ export default function LoginPage() {
               </button>
             </form>
           )}
-
-          {/* Quick Login Presets */}
-          <div className="mt-6 pt-5 border-t border-surface-100 dark:border-surface-800">
-            <div className="flex items-center gap-1.5 mb-2.5 text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">
-              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-              <span>Acesso Rápido de Demonstração</span>
-            </div>
-
-            <div className="space-y-2">
-              {mockUsers.map((u) => (
-                <button
-                  key={u.id}
-                  onClick={() => handleQuickLogin(u)}
-                  className="w-full flex items-center justify-between p-2.5 rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50/70 dark:bg-surface-800/40 hover:border-brand-500/40 hover:bg-brand-50/30 dark:hover:bg-brand-950/20 text-left transition-all group"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <img 
-                      src={u.avatar} 
-                      alt={u.name} 
-                      className="h-8 w-8 rounded-lg object-cover ring-1 ring-surface-200 dark:ring-surface-700" 
-                    />
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-surface-900 dark:text-white truncate group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
-                        {u.name}
-                      </p>
-                      <p className="text-[11px] text-surface-500 dark:text-surface-400 truncate">
-                        {u.role === 'admin' ? '🛡️ Coordenação Acadêmica' : `🎓 ${u.course} • ${u.semester}º Semestre`}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="shrink-0 text-[11px] font-semibold text-brand-600 dark:text-brand-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                    Entrar →
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
 
         </div>
 
