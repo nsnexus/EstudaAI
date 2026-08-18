@@ -1,11 +1,8 @@
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
-import { GraduationCap, ShieldCheck, ArrowLeft, Lock, Database, EyeOff, FileText } from 'lucide-react';
-
-export const metadata = {
-  title: 'Política de Privacidade | EstudaAI',
-  description: 'Política de privacidade e proteção de dados da plataforma e extensão EstudaAI.',
-};
+import { ShieldCheck, ArrowLeft, Lock, Database, EyeOff, FileText } from 'lucide-react';
 
 export default function PrivacidadePage() {
   return (
