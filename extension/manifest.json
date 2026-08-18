@@ -20,7 +20,11 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "EstudaAI - Conector Acadêmico"
+    "default_title": "EstudaAI - Conector Acadêmico",
+    "default_icon": "icon128.png"
+  },
+  "icons": {
+    "128": "icon128.png"
   },
   "background": {
     "service_worker": "background.js"
