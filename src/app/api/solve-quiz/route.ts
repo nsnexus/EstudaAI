@@ -37,21 +37,28 @@ export async function POST(req: NextRequest) {
       confidence: 0.95
     };
 
-    const prompt = `Você é um professor e jurista especialista em questões universitárias de ${discipline}.
-Analise a questão e as alternativas abaixo e indique qual é a alternativa juridicamente correta.
+    const prompt = `Você é um jurista brasileiro de altíssimo nível, professor universitário e especialista em provas e avaliações acadêmicas de ${discipline}.
+Sua missão é acertar com 100% de precisão a alternativa correta da questão abaixo.
 
 ENUNCIADO DA QUESTÃO:
 ${question}
 
-ALTERNATIVAS:
-${options.map((opt: string, i: number) => `[${String.fromCharCode(65 + i)}] ${opt}`).join('\n')}
+ALTERNATIVAS DISPONÍVEIS:
+${options.map((opt: string, i: number) => `[Alternativa ${String.fromCharCode(65 + i)}] ${opt}`).join('\n')}
+
+INSTRUÇÕES CRÍTICAS:
+1. Leia o enunciado com extrema atenção a pegadinhas, exceções da lei e sequências de V ou F (Verdadeiro ou Falso).
+2. Verifique os artigos exatos da legislação brasileira aplicável (Código Civil, CDC, CLT, CP, CF/88, etc.).
+3. Identifique a ÚNICA alternativa correta.
+4. "correctIndex" DEVE ser o índice numérico (0 para A, 1 para B, 2 para C, 3 para D, 4 para E).
+5. "correctLetter" DEVE ser a letra maiúscula ("A", "B", "C", "D" ou "E").
 
 Responda ESTRITAMENTE em formato JSON com esta estrutura:
 {
-  "correctIndex": <índice numérico de 0 a ${Math.max(0, options.length - 1)}>,
-  "correctLetter": "<letra A, B, C, D ou E>",
-  "explanation": "<justificativa técnica com base nos artigos da lei, código ou doutrina cabível>",
-  "confidence": 0.99
+  "correctIndex": <número de 0 a ${Math.max(0, options.length - 1)}>,
+  "correctLetter": "<A, B, C, D ou E>",
+  "explanation": "<explicação jurídica fundamentada demonstrando por que a alternativa está certa>",
+  "confidence": 1.0
 }`;
 
     // 1. Tenta resolver com OpenAI se houver chave configurada
