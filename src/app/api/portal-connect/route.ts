@@ -1,9 +1,9 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { Disciplina, CategoriaDisciplina } from '@/types';
 import { isValidCPF } from '@/lib/cpf-validator';
 
-// Node runtime: suporta fetch com cookies completos
-// export const runtime = 'edge'; // REMOVIDO - precisamos de Node para cookies
+// Cloudflare Pages requires Edge Runtime for all API routes
+export const runtime = 'edge';
 
 const INSTITUTION_URLS: Record<string, { loginUrl: string; dashboardUrl: string; name: string }> = {
   Anhanguera: {
@@ -47,8 +47,13 @@ async function getMoodleLoginToken(loginUrl: string): Promise<{ token: string; c
     const tokenMatch = html.match(/name="logintoken"\s+value="([^"]+)"/);
     if (!tokenMatch) return null;
 
-    const setCookies = res.headers.getSetCookie?.() ?? [];
-    const cookies = setCookies.map(c => c.split(';')[0]).join('; ');
+    // getSetCookie() is not available in all Edge environments; parse raw header instead
+    const rawSetCookie = res.headers.get('set-cookie') || '';
+    const cookies = rawSetCookie
+      .split(/,(?=[^ ].*?=)/) // split multiple Set-Cookie values
+      .map(c => c.split(';')[0].trim())
+      .filter(Boolean)
+      .join('; ');
 
     return { token: tokenMatch[1], cookies };
   } catch {
@@ -89,10 +94,14 @@ async function authenticateOnMoodle(
       redirect: 'manual' // captura o redirect sem seguir
     });
 
-    const setCookies = res.headers.getSetCookie?.() ?? [];
+    const rawSetCookie2 = res.headers.get('set-cookie') || '';
+    const newCookies = rawSetCookie2
+      .split(/,(?=[^ ].*?=)/)
+      .map(c => c.split(';')[0].trim())
+      .filter(Boolean);
     const sessionCookies = [
       ...initialCookies.split('; '),
-      ...setCookies.map(c => c.split(';')[0])
+      ...newCookies
     ].filter(Boolean).join('; ');
 
     // Moodle redireciona para /my/ em caso de sucesso; mantém na página de login em caso de falha
