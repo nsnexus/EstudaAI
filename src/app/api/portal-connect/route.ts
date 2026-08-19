@@ -71,7 +71,7 @@ async function authenticateOnMoodle(
   password: string,
   loginToken: string,
   initialCookies: string
-): Promise<{ success: boolean; sessionCookies: string; redirectUrl?: string }> {
+): Promise<{ success: boolean; sessionCookies: string; redirectUrl?: string; rawStatus?: number; rawLocation?: string }> {
   try {
     const bodyParams: Record<string, string> = {
       username: username,
@@ -112,9 +112,10 @@ async function authenticateOnMoodle(
     const location = res.headers.get('location') || '';
     const isSuccess = (res.status === 302 || res.status === 303) && !location.includes('login');
 
-    return { success: isSuccess, sessionCookies, redirectUrl: location };
-  } catch {
-    return { success: false, sessionCookies: '' };
+    return { success: isSuccess, sessionCookies, redirectUrl: location, rawStatus: res.status, rawLocation: location };
+  } catch (err) {
+    console.error('authenticateOnMoodle error:', err);
+    return { success: false, sessionCookies: '', rawStatus: 0 };
   }
 }
 
@@ -327,7 +328,10 @@ export async function POST(req: NextRequest) {
 
     if (!authResult.success) {
       return NextResponse.json(
-        { success: false, error: 'CPF/Matrícula ou senha incorretos. Verifique suas credenciais do Portal do Aluno.' },
+        { 
+          success: false, 
+          error: `Falha na autenticação (Status: ${authResult.rawStatus}, Loc: ${authResult.rawLocation || 'none'}). CPF/Matrícula ou senha incorretos.` 
+        },
         { status: 401 }
       );
     }
