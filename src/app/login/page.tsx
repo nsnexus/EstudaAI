@@ -9,9 +9,10 @@ import {
   User as UserIcon, 
   ArrowRight, 
   AlertCircle,
-  Loader2
+  Loader2,
+  CheckCircle2
 } from 'lucide-react';
-import { loginUser, registerUser } from '@/lib/storage';
+import { loginUser, registerUser, resetPassword } from '@/lib/storage';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,12 +25,15 @@ export default function LoginPage() {
   // Register form state
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [regCourse, setRegCourse] = useState('Direito');
   const [regSemester, setRegSemester] = useState(5);
   
   // Common state
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,8 +56,21 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    setSuccessMsg('');
     
-    const result = await registerUser(regName, regEmail, regCourse, regSemester);
+    if (regPassword !== regConfirmPassword) {
+      setError('As senhas não coincidem.');
+      setIsLoading(false);
+      return;
+    }
+
+    if (regPassword.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres.');
+      setIsLoading(false);
+      return;
+    }
+
+    const result = await registerUser(regName, regEmail, regPassword, regCourse, regSemester);
     if (result.success) {
       window.dispatchEvent(new Event('estudaai_auth_changed'));
       localStorage.setItem('estudaai_is_logged_in', 'true');
@@ -62,6 +79,25 @@ export default function LoginPage() {
       setError(result.error || 'Erro ao criar conta.');
       setIsLoading(false);
     }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      setError('Por favor, preencha o seu e-mail acima para recuperar a senha.');
+      return;
+    }
+    
+    setIsLoading(true);
+    setError('');
+    setSuccessMsg('');
+    
+    const result = await resetPassword(email);
+    if (result.success) {
+      setSuccessMsg('E-mail de recuperação enviado! Verifique sua caixa de entrada.');
+    } else {
+      setError(result.error || 'Erro ao enviar e-mail de recuperação.');
+    }
+    setIsLoading(false);
   };
 
   return (
@@ -100,6 +136,13 @@ export default function LoginPage() {
           </div>
         )}
 
+        {successMsg && (
+          <div className="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/20 flex gap-3 text-green-400 animate-in fade-in slide-in-from-top-2">
+            <CheckCircle2 className="w-5 h-5 shrink-0" />
+            <p className="text-sm">{successMsg}</p>
+          </div>
+        )}
+
         {tab === 'login' && (
           <form onSubmit={handleLogin} className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
             <div>
@@ -134,6 +177,16 @@ export default function LoginPage() {
                   required
                 />
               </div>
+              <div className="flex justify-end mt-1">
+                <button
+                  type="button"
+                  onClick={handleResetPassword}
+                  disabled={isLoading}
+                  className="text-xs text-brand-400 hover:text-brand-300 font-medium transition-colors"
+                >
+                  Esqueci minha senha
+                </button>
+              </div>
             </div>
 
             <button 
@@ -144,7 +197,7 @@ export default function LoginPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Entrando...</span>
+                  <span>Aguarde...</span>
                 </>
               ) : (
                 <>
@@ -187,6 +240,40 @@ export default function LoginPage() {
                   onChange={e => setRegEmail(e.target.value)}
                   className="w-full bg-slate-800/50 border border-slate-700 text-white rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all placeholder:text-slate-600"
                   placeholder="seu@email.com"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Senha</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-slate-500" />
+                </div>
+                <input 
+                  type="password" 
+                  value={regPassword}
+                  onChange={e => setRegPassword(e.target.value)}
+                  className="w-full bg-slate-800/50 border border-slate-700 text-white rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all placeholder:text-slate-600"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Confirmar Senha</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-slate-500" />
+                </div>
+                <input 
+                  type="password" 
+                  value={regConfirmPassword}
+                  onChange={e => setRegConfirmPassword(e.target.value)}
+                  className="w-full bg-slate-800/50 border border-slate-700 text-white rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all placeholder:text-slate-600"
+                  placeholder="••••••••"
                   required
                 />
               </div>

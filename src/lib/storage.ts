@@ -3,7 +3,7 @@
 import { User, StudySession, Flashcard, TutorPersona, AdminMetrics, UserRole, Disciplina } from '@/types';
 import { TUTOR_PERSONAS } from './personas';
 import { auth, db } from './firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc, setDoc, getDocs, collection, updateDoc } from 'firebase/firestore';
 
 const STORAGE_KEYS = {
@@ -105,19 +105,19 @@ export async function loginUser(email: string, password?: string): Promise<{ suc
   }
 }
 
-export async function registerUser(name: string, email: string, course: string, semester: number, role: UserRole = 'aluno'): Promise<{ success: boolean; user?: User; error?: string }> {
+export async function registerUser(name: string, email: string, password?: string, course?: string, semester?: number, role: UserRole = 'aluno'): Promise<{ success: boolean; user?: User; error?: string }> {
   if (!isClient()) return { success: false, error: 'Ambiente indisponível.' };
   initStorage();
 
   try {
-    const cred = await createUserWithEmailAndPassword(auth, email, '123456');
+    const cred = await createUserWithEmailAndPassword(auth, email, password || '123456');
     const newUser: User = {
       id: cred.user.uid,
       name: name.trim(),
       email: email.trim().toLowerCase(),
       role,
       avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8BFF&color=fff`,
-      course: course.trim() || 'Direito',
+      course: course?.trim() || 'Direito',
       semester: semester || 1,
       studyGoalMinutes: 45,
       createdAt: new Date().toISOString()
@@ -128,7 +128,21 @@ export async function registerUser(name: string, email: string, course: string, 
     return { success: true, user: newUser };
   } catch (error: any) {
     console.error('Register error:', error);
+    if (error.code === 'auth/weak-password') return { success: false, error: 'A senha deve ter pelo menos 6 caracteres.' };
+    if (error.code === 'auth/email-already-in-use') return { success: false, error: 'Este e-mail já está em uso.' };
     return { success: false, error: error.message || 'Falha ao registrar.' };
+  }
+}
+
+export async function resetPassword(email: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await sendPasswordResetEmail(auth, email);
+    return { success: true };
+  } catch (error: any) {
+    console.error('Reset password error:', error);
+    if (error.code === 'auth/user-not-found') return { success: false, error: 'Usuário não encontrado.' };
+    if (error.code === 'auth/invalid-email') return { success: false, error: 'E-mail inválido.' };
+    return { success: false, error: error.message || 'Falha ao enviar e-mail de recuperação.' };
   }
 }
 
