@@ -7,23 +7,23 @@ export const runtime = 'edge';
 
 const INSTITUTION_URLS: Record<string, { loginUrl: string; dashboardUrl: string; name: string }> = {
   Anhanguera: {
-    loginUrl: 'https://avaeduc.com.br/login/index.php',
-    dashboardUrl: 'https://avaeduc.com.br/my/',
+    loginUrl: 'https://www.avaeduc.com.br/login/index.php',
+    dashboardUrl: 'https://www.avaeduc.com.br/my/',
     name: 'Anhanguera'
   },
   Unopar: {
-    loginUrl: 'https://virtual.unopar.com.br/login/index.php',
-    dashboardUrl: 'https://virtual.unopar.com.br/my/',
+    loginUrl: 'https://www.colaboraread.com.br/login/auth',
+    dashboardUrl: 'https://www.colaboraread.com.br/my/',
     name: 'Unopar'
   },
   Pitágoras: {
-    loginUrl: 'https://ava.pitagoras.com.br/login/index.php',
-    dashboardUrl: 'https://ava.pitagoras.com.br/my/',
+    loginUrl: 'https://www.avaeduc.com.br/login/index.php',
+    dashboardUrl: 'https://www.avaeduc.com.br/my/',
     name: 'Pitágoras'
   },
   Kroton: {
-    loginUrl: 'https://avaeduc.com.br/login/index.php',
-    dashboardUrl: 'https://avaeduc.com.br/my/',
+    loginUrl: 'https://www.avaeduc.com.br/login/index.php',
+    dashboardUrl: 'https://www.avaeduc.com.br/my/',
     name: 'Ampli / Fama'
   }
 };
