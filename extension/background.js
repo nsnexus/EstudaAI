@@ -159,12 +159,22 @@ function executeDisciplineAutonomous(url, disciplinaNome, sendResponse) {
             target: { tabId: tab.id },
             files: ['content.js']
           }, () => {
+            if (chrome.runtime.lastError) {
+              console.error('Script injection failed:', chrome.runtime.lastError.message);
+              chrome.tabs.remove(tab.id);
+              sendResponse({ success: false, error: chrome.runtime.lastError.message, concluidas: 0, total: 0 });
+              return;
+            }
+            
             // Envia o comando
             chrome.tabs.sendMessage(tab.id, {
               action: 'AUTOPILOT_EXECUTE',
               task: 'complete_discipline',
               disciplinaNome: disciplinaNome
             }, (response) => {
+              if (chrome.runtime.lastError) {
+                console.error('Message failed:', chrome.runtime.lastError.message);
+              }
               // Resposta recebida, fecha a aba e responde pro EstudaAI
               chrome.tabs.remove(tab.id);
               sendResponse(response || { success: true, concluidas: 0, total: 0 });
