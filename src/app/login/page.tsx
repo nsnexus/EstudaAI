@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -36,18 +36,16 @@ export default function LoginPage() {
     setIsLoading(true);
     setError('');
     
-    setTimeout(() => {
-      const newUser = loginUser(email, regName || email.split('@')[0]);
-      if (newUser) {
-        // Sinaliza para a bridge e extensão que o usuário logou
-        window.dispatchEvent(new Event('estudaai_auth_changed'));
-        localStorage.setItem('estudaai_is_logged_in', 'true');
-        router.push('/');
-      } else {
-        setError('Erro ao realizar login.');
-        setIsLoading(false);
-      }
-    }, 800);
+    const result = await loginUser(email, password);
+    if (result.success) {
+      // Sinaliza para a bridge e extensão que o usuário logou
+      window.dispatchEvent(new Event('estudaai_auth_changed'));
+      localStorage.setItem('estudaai_is_logged_in', 'true');
+      router.push('/');
+    } else {
+      setError(result.error || 'Erro ao realizar login.');
+      setIsLoading(false);
+    }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -55,17 +53,15 @@ export default function LoginPage() {
     setIsLoading(true);
     setError('');
     
-    setTimeout(() => {
-      const newUser = registerUser(regName, regEmail, regCourse, regSemester);
-      if (newUser) {
-        window.dispatchEvent(new Event('estudaai_auth_changed'));
-        localStorage.setItem('estudaai_is_logged_in', 'true');
-        router.push('/');
-      } else {
-        setError('Erro ao criar conta.');
-        setIsLoading(false);
-      }
-    }, 800);
+    const result = await registerUser(regName, regEmail, regCourse, regSemester);
+    if (result.success) {
+      window.dispatchEvent(new Event('estudaai_auth_changed'));
+      localStorage.setItem('estudaai_is_logged_in', 'true');
+      router.push('/');
+    } else {
+      setError(result.error || 'Erro ao criar conta.');
+      setIsLoading(false);
+    }
   };
 
   return (

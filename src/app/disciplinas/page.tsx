@@ -46,6 +46,9 @@ import {
 } from '@/lib/storage';
 import { Disciplina, AtividadeDisciplina, User } from '@/types';
 
+import { doc, setDoc } from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
+
 export default function DisciplinasPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -58,6 +61,31 @@ export default function DisciplinasPage() {
 
   // Sync Portal Modal State
   const [syncModalOpen, setSyncModalOpen] = useState(false);
+
+  // Sync localStorage with Firestore
+  useEffect(() => {
+    const handleSyncToFirestore = async () => {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+      
+      const raw = localStorage.getItem('estudaai_disciplinas');
+      if (raw) {
+        try {
+          const discs: Disciplina[] = JSON.parse(raw);
+          // Atualiza as disciplinas em tempo real do frontend para o firestore
+          for (const d of discs) {
+            await setDoc(doc(db, 'users', currentUser.uid, 'disciplinas', d.id), d, { merge: true });
+          }
+          console.log('Disciplinas sincronizadas com o Firestore com sucesso!');
+        } catch (e) {
+          console.error('Erro ao sincronizar com o Firestore:', e);
+        }
+      }
+    };
+
+    window.addEventListener('estudaai_disciplinas_changed', handleSyncToFirestore);
+    return () => window.removeEventListener('estudaai_disciplinas_changed', handleSyncToFirestore);
+  }, []);
   const [instituicao, setInstituicao] = useState('Anhanguera');
   const [cpfMatricula, setCpfMatricula] = useState('');
   const [senhaPortal, setSenhaPortal] = useState('');
