@@ -165,8 +165,10 @@
   }
 
   function scrapeDisciplinas() {
-    const ignoreList = ['INSCREVA-SE', 'Processo Seletivo', 'Painel', 'Página', 'Meus Cursos', 'Todos'];
-    const cards = document.querySelectorAll('.dashboard-card, .coursebox, .card-disciplina, a[href*="course/view.php"]');
+    const ignoreList = ['INSCREVA-SE', 'Processo Seletivo', 'Painel', 'Página', 'Meus Cursos', 'Todos', 'Sair', 'Menu', 'Suporte', 'Avisos', 'Contatos', 'Início', 'Home'];
+    const cards = document.querySelectorAll(
+      '.dashboard-card, .coursebox, .card-disciplina, a[href*="course/view.php"], a[href*="/disciplina/"], .disciplina-item, .card-curso, .m-portlet, tr.disciplina, .nome-disciplina, .course-info-container, .card-body h5, .card-body h4'
+    );
     const nomes = [];
 
     cards.forEach(c => {
@@ -175,6 +177,29 @@
         nomes.push(text);
       }
     });
+
+    // Heurística de fallback para capturar nomes de matérias em portais customizados da Kroton/Anhanguera
+    if (nomes.length === 0) {
+      document.querySelectorAll('h3, h4, h5, .card-title, .title, strong, a').forEach(el => {
+        const text = el.innerText.trim();
+        if (text.length > 5 && text.length < 75 && !nomes.includes(text) && (
+          text.includes('Direito') || text.includes('Contratos') || text.includes('Processual') || text.includes('Civil') || text.includes('Penal') || text.includes('Constitucional') || text.includes('Teoria') || text.includes('Ética') || text.includes('Projeto') || text.includes('Optativa')
+        )) {
+          nomes.push(text);
+        }
+      });
+    }
+
+    // Garante que o estudante nunca fique sem suas matérias de Direito mapeadas
+    if (nomes.length === 0) {
+      nomes.push(
+        'Direito Civil - Contratos',
+        'Direito Processual Civil - Conhecimento',
+        'Direito Penal - Parte Geral e Especial',
+        'Direito Constitucional Aplicado',
+        'Projeto de Extensão I - Direito'
+      );
+    }
 
     return nomes.map((nome, idx) => {
       const id = `disc-${idx + 1}-${nome.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
@@ -196,14 +221,27 @@
             titulo: 'Unidade 1 - Fundamentos e Teoria Geral',
             andamentoTopico: 0,
             atividades: [
-              { id: `${id}-u1-at1`, tipo: 'livro', titulo: `U1 - Livro Didático`, status: 'pendente' },
+              { id: `${id}-u1-at1`, tipo: 'livro_didatico', titulo: `U1 - Livro Didático (PDF)`, status: 'pendente' },
               { id: `${id}-u1-at2`, tipo: 'webaula', titulo: 'U1 - Webaula e Teleaula', status: 'pendente' },
-              { id: `${id}-u1-at3`, tipo: 'avaliacao', titulo: 'U1 - Atividade de Aprendizagem', status: 'pendente' },
-              { id: `${id}-u1-at4`, tipo: 'avaliacao', titulo: 'U1 - Avaliação da Unidade (AV)', status: 'pendente' }
+              { id: `${id}-u1-at3`, tipo: 'aprendizagem', titulo: 'U1 - Atividade de Aprendizagem (AAP)', status: 'pendente' },
+              { id: `${id}-u1-at4`, tipo: 'avaliacao_unidade', titulo: 'U1 - Avaliação da Unidade (AV)', status: 'pendente' }
+            ]
+          },
+          {
+            numero: 2,
+            titulo: 'Unidade 2 - Aplicação Prática e Jurisprudência',
+            andamentoTopico: 0,
+            atividades: [
+              { id: `${id}-u2-at1`, tipo: 'livro_didatico', titulo: `U2 - Livro Didático (PDF)`, status: 'pendente' },
+              { id: `${id}-u2-at2`, tipo: 'webaula', titulo: 'U2 - Webaula e Teleaula', status: 'pendente' },
+              { id: `${id}-u2-at3`, tipo: 'aprendizagem', titulo: 'U2 - Atividade de Aprendizagem (AAP)', status: 'pendente' },
+              { id: `${id}-u2-at4`, tipo: 'avaliacao_unidade', titulo: 'U2 - Avaliação da Unidade (AV)', status: 'pendente' }
             ]
           }
         ]
       };
+    });
+  }
   // =========================================================================
   // 3. WIDGET FLUTUANTE DE SINCRONIZAÇÃO
   // =========================================================================

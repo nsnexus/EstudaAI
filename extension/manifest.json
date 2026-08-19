@@ -1,20 +1,25 @@
 {
   "manifest_version": 3,
   "name": "EstudaAI - Conector AVA Anhanguera & Kroton",
-  "version": "1.0.0",
-  "description": "Sincronizador automático de disciplinas, atividades e tutor IA para o Portal Anhanguera, Unopar e AVA KLS.",
+  "version": "1.0.1",
+  "description": "Sincronizador automático de disciplinas, atividades e tutor IA para o Portal Anhanguera, Unopar, Colaborar e AVA KLS.",
   "permissions": [
+    "tabs",
     "activeTab",
     "storage",
     "scripting"
   ],
   "host_permissions": [
-    "https://www.avaeduc.com.br/*",
     "https://*.avaeduc.com.br/*",
-    "https://alunodigital.anhanguera.com/*",
-    "https://login.anhanguera.com/*",
+    "https://*.colaboraread.com.br/*",
+    "https://*.anhanguera.com/*",
+    "https://*.kroton.com.br/*",
+    "https://*.kroton.com/*",
     "https://*.unopar.com.br/*",
+    "https://*.unopar.br/*",
     "https://*.pitagoras.com.br/*",
+    "https://*.pitagoras.br/*",
+    "https://*.ampli.me/*",
     "https://estudaai.pages.dev/*",
     "http://localhost:3000/*",
     "http://localhost:3001/*",
@@ -36,12 +41,16 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.avaeduc.com.br/*",
         "https://*.avaeduc.com.br/*",
-        "https://alunodigital.anhanguera.com/*",
-        "https://login.anhanguera.com/*",
+        "https://*.colaboraread.com.br/*",
+        "https://*.anhanguera.com/*",
+        "https://*.kroton.com.br/*",
+        "https://*.kroton.com/*",
         "https://*.unopar.com.br/*",
-        "https://*.pitagoras.com.br/*"
+        "https://*.unopar.br/*",
+        "https://*.pitagoras.com.br/*",
+        "https://*.pitagoras.br/*",
+        "https://*.ampli.me/*"
       ],
       "js": ["content.js"],
       "css": ["content.css"],
