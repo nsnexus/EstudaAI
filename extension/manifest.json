@@ -16,7 +16,11 @@
     "https://*.unopar.com.br/*",
     "https://*.pitagoras.com.br/*",
     "https://estudaai.pages.dev/*",
-    "http://localhost:3000/*"
+    "http://localhost:3000/*",
+    "http://localhost:3001/*",
+    "http://localhost:3002/*",
+    "http://localhost:3003/*",
+    "http://127.0.0.1:3000/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -35,6 +39,7 @@
         "https://www.avaeduc.com.br/*",
         "https://*.avaeduc.com.br/*",
         "https://alunodigital.anhanguera.com/*",
+        "https://login.anhanguera.com/*",
         "https://*.unopar.com.br/*",
         "https://*.pitagoras.com.br/*"
       ],
@@ -45,7 +50,11 @@
     {
       "matches": [
         "https://estudaai.pages.dev/*",
-        "http://localhost:3000/*"
+        "http://localhost:3000/*",
+        "http://localhost:3001/*",
+        "http://localhost:3002/*",
+        "http://localhost:3003/*",
+        "http://127.0.0.1:3000/*"
       ],
       "js": ["estudaai-bridge.js"],
       "run_at": "document_end"

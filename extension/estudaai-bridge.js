@@ -55,13 +55,25 @@
           };
           localStorage.setItem('estudaai_current_user', JSON.stringify(currentUser));
         }
-
         window.dispatchEvent(new Event('estudaai_disciplinas_changed'));
         window.dispatchEvent(new Event('estudaai_auth_changed'));
-        window.location.reload();
       } catch (err) {
         console.error('Erro na injeção em tempo real:', err);
       }
     }
   });
+
+  // Sincroniza de volta para a extensão quando o painel web atualizar
+  window.addEventListener('estudaai_disciplinas_changed', () => {
+    try {
+      const raw = localStorage.getItem('estudaai_disciplinas');
+      if (raw) {
+        const discs = JSON.parse(raw);
+        chrome.storage.local.set({ estudaai_disciplinas: discs });
+      }
+    } catch (e) {
+      console.warn('Erro ao salvar atualização no storage da extensão:', e);
+    }
+  });
 })();
+

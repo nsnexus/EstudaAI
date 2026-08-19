@@ -9,12 +9,10 @@
   // 1. AUTO-PILOT DE PROVAS E QUESTIONÁRIOS (MULTICHOICE)
   // =========================================================================
   async function checkAndSolveQuizQuestions() {
-    const isQuizPage = window.location.href.includes('/mod/quiz/attempt.php') || 
-                       window.location.href.includes('/mod/quiz/processattempt.php');
-    
     const questions = Array.from(document.querySelectorAll('.que.multichoice, .que, .formulation'));
-
-    if (isQuizPage && questions.length > 0) {
+    const isQuizPage = window.location.href.includes('/mod/quiz/') || questions.length > 0;
+    
+    if (questions.length > 0) {
       console.log(`🎯 EstudaAI Auto-Pilot: Detectadas ${questions.length} questões na página.`);
 
       // Cria HUD visual no topo da tela do AVA
@@ -56,19 +54,38 @@
         }
         q.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-        try {
-          const res = await fetch('https://estudaai.pages.dev/api/solve-quiz', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              question: qText,
-              options: answerLabels,
-              discipline: 'Direito Civil - Contratos',
-              provider: 'openai'
-            })
-          });
+        // Detecta nome da disciplina dinamicamente
+        const disciplineName = document.querySelector('.page-header-headings h1, .breadcrumb li:nth-last-child(2), h1')?.innerText?.trim() || 'Direito e Formação Geral';
 
-          const data = await res.json();
+        try {
+          let data = null;
+          
+          // Tenta primeiro no localhost (se o servidor local estiver ativo), depois na nuvem
+          const endpoints = [
+            'http://localhost:3000/api/solve-quiz',
+            'https://estudaai.pages.dev/api/solve-quiz'
+          ];
+
+          for (const url of endpoints) {
+            try {
+              const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  question: qText,
+                  options: answerLabels,
+                  discipline: disciplineName,
+                  provider: 'openai'
+                })
+              });
+              if (res.ok) {
+                data = await res.json();
+                break;
+              }
+            } catch (fetchErr) {
+              // segue para o próximo endpoint
+            }
+          }
 
           if (data && typeof data.correctIndex === 'number' && radioInputs[data.correctIndex]) {
             // 1. Clica na alternativa correta
@@ -89,11 +106,11 @@
               margin-top: 10px; padding: 12px; border-radius: 10px;
               background: #064e3b; color: #a7f3d0; font-size: 12px; border: 1px solid #10b981;
             `;
-            note.innerHTML = `<strong>🎯 Alternativa ${data.correctLetter || ''} marcada!</strong><br/><em>${data.explanation}</em>`;
+            note.innerHTML = `<strong>🎯 Alternativa ${data.correctLetter || ''} marcada!</strong><br/><em>${data.explanation || 'Analisado com base nos princípios da matéria.'}</em>`;
             q.appendChild(note);
           }
         } catch (err) {
-          console.error(err);
+          console.error('Erro no Auto-Pilot:', err);
         }
 
         await new Promise(r => setTimeout(r, 1200));
@@ -187,15 +204,187 @@
           }
         ]
       };
+  // =========================================================================
+  // 3. WIDGET FLUTUANTE DE SINCRONIZAÇÃO
+  // =========================================================================
+  function renderFloatingWidget() {
+    // Não exibe widget em telas de quiz/prova
+    if (window.location.href.includes('/mod/quiz/')) return;
+    if (document.getElementById('estudaai-floating-widget')) return;
+
+    const student = getStudentInfo();
+    const widget = document.createElement('div');
+    widget.id = 'estudaai-floating-widget';
+    widget.innerHTML = `
+      <div class="estudaai-widget-card">
+        <div class="estudaai-widget-header">
+          <span class="estudaai-badge">🎓 EstudaAI Conector</span>
+          <button id="estudaai-close-widget" title="Fechar">✕</button>
+        </div>
+        <div class="estudaai-student-name">${student.name}</div>
+        <div class="estudaai-info-text">Sincronize suas disciplinas e atividades com a plataforma EstudaAI em 1 clique.</div>
+        <button id="estudaai-btn-sync-widget" class="estudaai-btn-sync">⚡ Sincronizar com EstudaAI</button>
+        <div id="estudaai-widget-status" class="estudaai-status-msg" style="display:none;"></div>
+      </div>
+    `;
+    document.body.appendChild(widget);
+
+    document.getElementById('estudaai-close-widget')?.addEventListener('click', () => {
+      widget.remove();
+    });
+
+    const syncBtn = document.getElementById('estudaai-btn-sync-widget');
+    const statusBox = document.getElementById('estudaai-widget-status');
+
+    syncBtn?.addEventListener('click', () => {
+      syncBtn.disabled = true;
+      syncBtn.innerText = '🔄 Sincronizando...';
+
+      const studentData = getStudentInfo();
+      const discData = scrapeDisciplinas();
+
+      chrome.runtime.sendMessage({
+        action: 'SAVE_DISCIPLINAS',
+        payload: {
+          student: studentData,
+          disciplinas: discData,
+          scrapedAt: new Date().toISOString()
+        }
+      }, (res) => {
+        syncBtn.disabled = false;
+        syncBtn.innerText = '✅ Sincronizado!';
+        if (statusBox) {
+          statusBox.style.display = 'block';
+          statusBox.innerHTML = `
+            🎉 <strong>${discData.length} matérias</strong> sincronizadas!<br/>
+            <a href="http://localhost:3000/disciplinas" target="_blank">👉 Abrir no EstudaAI</a>
+          `;
+        }
+      });
     });
   }
 
+  // =========================================================================
+  // 4. AUTO-COMPLETE DE WEBAULAS, VÍDEOS, LEITURA E SCORM (NÃO-QUESTÕES)
+  // =========================================================================
+  function autoCompleteNonQuizActivities() {
+    // 1. Completa SCORM / Webaulas Interativas via API do LMS
+    try {
+      const win = window;
+      const api = win.API || win.parent?.API || win.top?.API;
+      const api2004 = win.API_1484_11 || win.parent?.API_1484_11 || win.top?.API_1484_11;
+
+      if (api) {
+        api.LMSSetValue('cmi.core.lesson_status', 'completed');
+        api.LMSSetValue('cmi.core.lesson_location', '100');
+        api.LMSSetValue('cmi.core.score.raw', '100');
+        api.LMSCommit('');
+        console.log('✅ EstudaAI: SCORM 1.2 marcado como 100% concluído!');
+        showToast('🎉 Webaula / SCORM concluído com sucesso!');
+      } else if (api2004) {
+        api2004.SetValue('cmi.completion_status', 'completed');
+        api2004.SetValue('cmi.success_status', 'passed');
+        api2004.SetValue('cmi.progress_measure', '1.0');
+        api2004.Commit('');
+        console.log('✅ EstudaAI: SCORM 2004 marcado como 100% concluído!');
+        showToast('🎉 Webaula / SCORM 2004 concluído com sucesso!');
+      }
+    } catch (e) {
+      console.warn('Erro ao completar SCORM:', e);
+    }
+
+    // 2. Acelera e conclui vídeos (Teleaulas e Webaulas em vídeo)
+    const videos = Array.from(document.querySelectorAll('video'));
+    videos.forEach(v => {
+      try {
+        if (v && !v.ended && v.duration > 0) {
+          v.currentTime = Math.max(0, v.duration - 1);
+          v.play().catch(() => {});
+          console.log('✅ EstudaAI: Vídeo avançado para o final para computar presença!');
+          showToast('🎬 Vídeo/Teleaula 100% assistido!');
+        }
+      } catch (err) {
+        console.warn('Vídeo protegido ou erro ao avançar:', err);
+      }
+    });
+
+    // 3. Clica em botões de "Marcar como Concluído" do Moodle se existirem
+    const completionBtns = Array.from(document.querySelectorAll(
+      'button[data-action="toggle-manual-completion"], form.togglecompletion input[type="submit"], .btn-outline-secondary.btn-sm'
+    ));
+    completionBtns.forEach(btn => {
+      const text = (btn.value || btn.innerText || '').toLowerCase();
+      if (text.includes('marcar como concluíd') || text.includes('marcar como fe') || text.includes('concluir')) {
+        btn.click();
+        console.log('✅ EstudaAI: Botão de conclusão manual acionado!');
+      }
+    });
+
+    // 4. Rola a página de leitura suavemente para marcar leitura completa no AVA
+    if (window.location.href.includes('/mod/resource/') || 
+        window.location.href.includes('/mod/page/') || 
+        window.location.href.includes('/mod/book/')) {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+  }
+
+  // Notificação Toast visual discreta
+  function showToast(message) {
+    let toast = document.getElementById('estudaai-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'estudaai-toast';
+      toast.style.cssText = `
+        position: fixed; bottom: 20px; left: 20px; z-index: 9999999;
+        background: #0f172a; color: #34d399; padding: 12px 20px;
+        border-radius: 12px; border: 1px solid #10b981;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5); font-family: sans-serif;
+        font-size: 13px; font-weight: bold; animation: estudaai-slide-in 0.3s ease;
+      `;
+      document.body.appendChild(toast);
+    }
+    toast.innerHTML = message;
+    toast.style.display = 'block';
+    setTimeout(() => {
+      if (toast) toast.style.display = 'none';
+    }, 4000);
+  }
+
+  // =========================================================================
+  // 5. COMUNICAÇÃO VIA MESSAGES (POPUP)
+  // =========================================================================
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'SCRAPE_DATA') {
+      const student = getStudentInfo();
+      const disciplinas = scrapeDisciplinas();
+      sendResponse({
+        success: true,
+        student,
+        disciplinas
+      });
+    }
+
+    if (request.action === 'AUTO_COMPLETE_ACTIVITY') {
+      autoCompleteNonQuizActivities();
+      sendResponse({ success: true });
+    }
+  });
+
   // Auto-execução ao carregar a página
   window.addEventListener('load', () => {
-    setTimeout(checkAndSolveQuizQuestions, 1000);
+    setTimeout(() => {
+      checkAndSolveQuizQuestions();
+      renderFloatingWidget();
+      autoCompleteNonQuizActivities();
+    }, 1200);
   });
 
   if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    setTimeout(checkAndSolveQuizQuestions, 1000);
+    setTimeout(() => {
+      checkAndSolveQuizQuestions();
+      renderFloatingWidget();
+      autoCompleteNonQuizActivities();
+    }, 1200);
   }
 })();
+

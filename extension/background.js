@@ -20,7 +20,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       console.log('Dados do AVA salvos com sucesso na extensão:', data);
       
       // Procura abas abertas do EstudaAI para enviar os dados em tempo real
-      chrome.tabs.query({ url: ['https://estudaai.pages.dev/*', 'http://localhost:3000/*'] }, (tabs) => {
+      chrome.tabs.query({ 
+        url: [
+          'https://estudaai.pages.dev/*',
+          'http://localhost:3000/*',
+          'http://localhost:3001/*',
+          'http://localhost:3002/*',
+          'http://localhost:3003/*',
+          'http://127.0.0.1:3000/*'
+        ] 
+      }, (tabs) => {
         tabs.forEach(tab => {
           if (tab.id) {
             chrome.tabs.sendMessage(tab.id, {

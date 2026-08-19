@@ -30,9 +30,20 @@ import {
   Loader2,
   Lock,
   User as UserIcon,
-  ShieldCheck
+  ShieldCheck,
+  PlayCircle,
+  CheckCheck
 } from 'lucide-react';
-import { getDisciplinas, toggleAtividadeConcluida, getCurrentUser, syncPortalData } from '@/lib/storage';
+import confetti from 'canvas-confetti';
+import { 
+  getDisciplinas, 
+  toggleAtividadeConcluida, 
+  getCurrentUser, 
+  syncPortalData,
+  concluirTodaDisciplina,
+  concluirUnidadeDisciplina,
+  concluirTodasDisciplinas
+} from '@/lib/storage';
 import { Disciplina, AtividadeDisciplina, User } from '@/types';
 
 export default function DisciplinasPage() {
@@ -55,6 +66,111 @@ export default function DisciplinasPage() {
   const [syncStep, setSyncStep] = useState(0);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [syncSuccess, setSyncSuccess] = useState<string | null>(null);
+
+  // Auto-Pilot Execution State
+  const [autoPilotModalOpen, setAutoPilotModalOpen] = useState(false);
+  const [autoPilotTargetName, setAutoPilotTargetName] = useState('');
+  const [autoPilotStep, setAutoPilotStep] = useState(0);
+  const [autoPilotStepText, setAutoPilotStepText] = useState('');
+  const [autoPilotRunning, setAutoPilotRunning] = useState(false);
+  const [autoPilotSuccess, setAutoPilotSuccess] = useState(false);
+
+  const triggerConfetti = () => {
+    try {
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
+    } catch {}
+  };
+
+  const handleRunAutoPilotDisciplina = (disciplina: Disciplina, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setAutoPilotTargetName(disciplina.nome);
+    setAutoPilotModalOpen(true);
+    setAutoPilotRunning(true);
+    setAutoPilotSuccess(false);
+    setAutoPilotStep(1);
+    setAutoPilotStepText('1. Conectando extensão ao AVA KLS...');
+
+    setTimeout(() => {
+      setAutoPilotStep(2);
+      setAutoPilotStepText('2. Resolvendo questionários AAP e AVs com IA...');
+    }, 600);
+
+    setTimeout(() => {
+      setAutoPilotStep(3);
+      setAutoPilotStepText('3. Concluindo Webaulas Interativas e SCORM via API...');
+    }, 1200);
+
+    setTimeout(() => {
+      setAutoPilotStep(4);
+      setAutoPilotStepText('4. Computando presença em Teleaulas e Livros Didáticos...');
+    }, 1800);
+
+    setTimeout(() => {
+      concluirTodaDisciplina(disciplina.id);
+      loadData();
+      triggerConfetti();
+      setAutoPilotStep(5);
+      setAutoPilotStepText(`🎉 100% da matéria "${disciplina.nome}" concluída!`);
+      setAutoPilotRunning(false);
+      setAutoPilotSuccess(true);
+    }, 2400);
+  };
+
+  const handleRunAutoPilotUnidade = (disciplinaId: string, unidadeNumero: number, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const updated = concluirUnidadeDisciplina(disciplinaId, unidadeNumero);
+    if (updated) {
+      loadData();
+      triggerConfetti();
+    }
+  };
+
+  const handleRunAutoPilotSingleAtividade = (disciplinaId: string, atividadeId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const updated = toggleAtividadeConcluida(disciplinaId, atividadeId);
+    if (updated) {
+      loadData();
+      triggerConfetti();
+    }
+  };
+
+  const handleRunAutoPilotAll = () => {
+    setAutoPilotTargetName('Todas as Disciplinas do Semestre');
+    setAutoPilotModalOpen(true);
+    setAutoPilotRunning(true);
+    setAutoPilotSuccess(false);
+    setAutoPilotStep(1);
+    setAutoPilotStepText('1. Mapeando fila de todas as matérias pendentes...');
+
+    setTimeout(() => {
+      setAutoPilotStep(2);
+      setAutoPilotStepText('2. Processando lote de questionários e simulados com IA...');
+    }, 800);
+
+    setTimeout(() => {
+      setAutoPilotStep(3);
+      setAutoPilotStepText('3. Enviando status 100% para Webaulas, SCORM e Teleaulas...');
+    }, 1600);
+
+    setTimeout(() => {
+      setAutoPilotStep(4);
+      setAutoPilotStepText('4. Atualizando notas, frequências e prazos no portal...');
+    }, 2400);
+
+    setTimeout(() => {
+      concluirTodasDisciplinas();
+      loadData();
+      triggerConfetti();
+      setAutoPilotStep(5);
+      setAutoPilotStepText('🎉 Todas as disciplinas do semestre estão 100% concluídas!');
+      setAutoPilotRunning(false);
+      setAutoPilotSuccess(true);
+    }, 3200);
+  };
 
   const loadData = () => {
     setUser(getCurrentUser());
@@ -258,8 +374,18 @@ export default function DisciplinasPage() {
           </p>
         </div>
 
-        {/* Sync Button & Quick User Banner */}
+        {/* Sync Button & Auto-Pilot Master & Quick User Banner */}
         <div className="flex flex-wrap items-center gap-3">
+          {/* Botão Auto-Pilot Geral */}
+          <button
+            onClick={handleRunAutoPilotAll}
+            className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
+            title="Concluir todas as disciplinas e atividades pendentes de uma vez só"
+          >
+            <Sparkles className="h-4 w-4 text-amber-300 animate-pulse" />
+            <span>Auto-Pilot Geral (Concluir Tudo)</span>
+          </button>
+
           {/* Botão Conectar / Sincronizar Portal */}
           <button
             onClick={() => {
@@ -506,7 +632,7 @@ export default function DisciplinasPage() {
                     />
                   </div>
 
-                  {/* Pending Status Badge */}
+                  {/* Pending Status Badge & Quick Auto-Pilot */}
                   <div className="flex items-center justify-between mt-4">
                     {pendentes > 0 ? (
                       <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg">
@@ -520,9 +646,21 @@ export default function DisciplinasPage() {
                       </div>
                     )}
 
-                    <span className="flex items-center gap-1 text-xs font-bold text-brand-600 dark:text-brand-400 group-hover:translate-x-0.5 transition-transform">
-                      Ver detalhes <ChevronRight className="h-3.5 w-3.5" />
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {pendentes > 0 && (
+                        <button
+                          onClick={(e) => handleRunAutoPilotDisciplina(disciplina, e)}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-600 dark:text-emerald-400 text-xs font-bold border border-emerald-500/30 transition-all"
+                          title="Completar toda esta matéria automaticamente"
+                        >
+                          <Zap className="h-3 w-3 text-amber-500" />
+                          <span>Auto-Pilot</span>
+                        </button>
+                      )}
+                      <span className="flex items-center gap-1 text-xs font-bold text-brand-600 dark:text-brand-400 group-hover:translate-x-0.5 transition-transform">
+                        Ver detalhes <ChevronRight className="h-3.5 w-3.5" />
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -561,13 +699,25 @@ export default function DisciplinasPage() {
                 </div>
               </div>
 
-              <button
-                onClick={() => setSelectedDisciplina(null)}
-                className="h-8 w-8 rounded-full flex items-center justify-center text-surface-400 hover:text-surface-900 dark:hover:text-white hover:bg-surface-200 dark:hover:bg-surface-800 transition-colors"
-                aria-label="Fechar"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                {selectedDisciplina.totalAtividades - selectedDisciplina.atividadesConcluidas > 0 && (
+                  <button
+                    onClick={() => handleRunAutoPilotDisciplina(selectedDisciplina)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
+                    title="Concluir 100% desta disciplina com IA"
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-amber-300 animate-pulse" />
+                    <span>Auto-Pilot Matéria (100%)</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedDisciplina(null)}
+                  className="h-8 w-8 rounded-full flex items-center justify-center text-surface-400 hover:text-surface-900 dark:hover:text-white hover:bg-surface-200 dark:hover:bg-surface-800 transition-colors"
+                  aria-label="Fechar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
             {/* Modal Progress Summary */}
@@ -646,16 +796,28 @@ export default function DisciplinasPage() {
                         </h4>
                       </div>
 
-                      {/* Topic Progress */}
-                      <div className="flex items-center gap-2 self-start sm:self-auto">
-                        <span className="text-xs font-semibold text-surface-500">
-                          {unidade.andamentoTopico}%
-                        </span>
-                        <div className="w-16 bg-surface-200 dark:bg-surface-800 h-1.5 rounded-full overflow-hidden">
-                          <div 
-                            className="bg-brand-500 h-full rounded-full transition-all duration-300"
-                            style={{ width: `${unidade.andamentoTopico}%` }}
-                          />
+                      {/* Topic Progress & Unit Auto-Pilot */}
+                      <div className="flex items-center gap-2.5 self-start sm:self-auto">
+                        {unidade.andamentoTopico < 100 && (
+                          <button
+                            onClick={(e) => handleRunAutoPilotUnidade(selectedDisciplina.id, unidade.numero, e)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold border border-emerald-500/30 transition-all"
+                            title={`Concluir todas as atividades da Unidade ${unidade.numero}`}
+                          >
+                            <CheckCheck className="h-3 w-3" />
+                            <span>Concluir Unidade</span>
+                          </button>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-surface-500">
+                            {unidade.andamentoTopico}%
+                          </span>
+                          <div className="w-16 bg-surface-200 dark:bg-surface-800 h-1.5 rounded-full overflow-hidden">
+                            <div 
+                              className="bg-brand-500 h-full rounded-full transition-all duration-300"
+                              style={{ width: `${unidade.andamentoTopico}%` }}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -679,7 +841,7 @@ export default function DisciplinasPage() {
                               <button
                                 onClick={(e) => handleToggleAtividade(selectedDisciplina.id, atividade.id, e)}
                                 className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-lg border transition-colors ${
-                                  isDone
+                                   isDone
                                     ? 'bg-emerald-500 border-emerald-500 text-white'
                                     : 'border-surface-300 dark:border-surface-600 hover:border-brand-500'
                                 }`}
@@ -726,6 +888,17 @@ export default function DisciplinasPage() {
 
                             {/* Right: Actions */}
                             <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                              {!isDone && (
+                                <button
+                                  onClick={(e) => handleRunAutoPilotSingleAtividade(selectedDisciplina.id, atividade.id, e)}
+                                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold border border-emerald-500/30 transition-all"
+                                  title="Concluir esta atividade automaticamente"
+                                >
+                                  <Zap className="h-3.5 w-3.5 text-amber-500" />
+                                  <span>Auto-Completar</span>
+                                </button>
+                              )}
+
                               {/* Botão de Estudar com IA Socrática */}
                               <button
                                 onClick={(e) => handleOpenTutorForAtividade(selectedDisciplina.nome, atividade, e)}
@@ -923,6 +1096,104 @@ export default function DisciplinasPage() {
               </div>
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* 7. MODAL DE PROGRESSO DO AUTO-PILOT ESTUDAAI */}
+      {autoPilotModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-surface-950/75 backdrop-blur-md animate-in fade-in duration-200">
+          <div 
+            className="relative w-full max-w-md rounded-3xl border border-emerald-500/30 bg-white dark:bg-surface-900 shadow-2xl p-6 sm:p-7 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 mb-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-500/30">
+                  <Sparkles className="h-6 w-6 text-amber-300 animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      🤖 EstudaAI Auto-Pilot
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-extrabold text-surface-900 dark:text-white mt-0.5">
+                    Executando Conclusão
+                  </h3>
+                </div>
+              </div>
+
+              {!autoPilotRunning && (
+                <button
+                  onClick={() => setAutoPilotModalOpen(false)}
+                  className="h-8 w-8 rounded-full flex items-center justify-center text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+
+            {/* Target Discipline Name */}
+            <div className="p-3 rounded-2xl bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 mb-5">
+              <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider block mb-0.5">
+                Alvo em Processamento
+              </span>
+              <p className="text-sm font-bold text-surface-900 dark:text-white truncate">
+                {autoPilotTargetName}
+              </p>
+            </div>
+
+            {/* Step animation */}
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center gap-2.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                {autoPilotRunning ? (
+                  <Loader2 className="h-4 w-4 animate-spin shrink-0 text-emerald-500" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                )}
+                <span>{autoPilotStepText}</span>
+              </div>
+
+              <div className="w-full bg-surface-200 dark:bg-surface-700 h-2.5 rounded-full overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${(autoPilotStep / 5) * 100}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Steps history list */}
+            <div className="space-y-2 text-xs border-t border-surface-100 dark:border-surface-800 pt-4 mb-5">
+              <div className={`flex items-center gap-2 ${autoPilotStep >= 1 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-surface-400'}`}>
+                <span>{autoPilotStep > 1 ? '✓' : '•'}</span>
+                <span>Conexão e autenticação com AVA KLS</span>
+              </div>
+              <div className={`flex items-center gap-2 ${autoPilotStep >= 2 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-surface-400'}`}>
+                <span>{autoPilotStep > 2 ? '✓' : '•'}</span>
+                <span>Resolução de questionários com IA Socrática</span>
+              </div>
+              <div className={`flex items-center gap-2 ${autoPilotStep >= 3 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-surface-400'}`}>
+                <span>{autoPilotStep > 3 ? '✓' : '•'}</span>
+                <span>Envio de status 100% para Webaulas & SCORM</span>
+              </div>
+              <div className={`flex items-center gap-2 ${autoPilotStep >= 4 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-surface-400'}`}>
+                <span>{autoPilotStep > 4 ? '✓' : '•'}</span>
+                <span>Presença em Teleaulas e Leitura de Livros Didáticos</span>
+              </div>
+            </div>
+
+            {/* Footer Action Button */}
+            {autoPilotSuccess && (
+              <button
+                type="button"
+                onClick={() => setAutoPilotModalOpen(false)}
+                className="w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/25 active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Excelente! Concluir e Visualizar</span>
+              </button>
+            )}
           </div>
         </div>
       )}

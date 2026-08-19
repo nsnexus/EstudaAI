@@ -242,6 +242,85 @@ export function toggleAtividadeConcluida(disciplinaId: string, atividadeId: stri
   return disc;
 }
 
+export function concluirTodaDisciplina(disciplinaId: string): Disciplina | null {
+  if (!isClient()) return null;
+  const list = getDisciplinas();
+  const discIndex = list.findIndex(d => d.id === disciplinaId);
+  if (discIndex === -1) return null;
+
+  const disc = list[discIndex];
+  let total = 0;
+
+  disc.unidades.forEach(u => {
+    u.atividades.forEach(a => {
+      a.status = 'concluida';
+      a.dataConclusao = new Date().toISOString();
+    });
+    u.andamentoTopico = 100;
+    total += u.atividades.length;
+  });
+
+  disc.totalAtividades = total;
+  disc.atividadesConcluidas = total;
+  disc.andamentoGeral = 100;
+
+  list[discIndex] = disc;
+  saveDisciplinas(list);
+  return disc;
+}
+
+export function concluirUnidadeDisciplina(disciplinaId: string, unidadeNumero: number): Disciplina | null {
+  if (!isClient()) return null;
+  const list = getDisciplinas();
+  const discIndex = list.findIndex(d => d.id === disciplinaId);
+  if (discIndex === -1) return null;
+
+  const disc = list[discIndex];
+  const unidade = disc.unidades.find(u => u.numero === unidadeNumero);
+  if (!unidade) return null;
+
+  unidade.atividades.forEach(a => {
+    a.status = 'concluida';
+    a.dataConclusao = new Date().toISOString();
+  });
+  unidade.andamentoTopico = 100;
+
+  let total = 0;
+  let concluidas = 0;
+  disc.unidades.forEach(u => {
+    total += u.atividades.length;
+    concluidas += u.atividades.filter(a => a.status === 'concluida').length;
+  });
+
+  disc.totalAtividades = total;
+  disc.atividadesConcluidas = concluidas;
+  disc.andamentoGeral = total > 0 ? Math.round((concluidas / total) * 100) : 0;
+
+  list[discIndex] = disc;
+  saveDisciplinas(list);
+  return disc;
+}
+
+export function concluirTodasDisciplinas(): void {
+  if (!isClient()) return;
+  const list = getDisciplinas();
+  list.forEach(disc => {
+    let total = 0;
+    disc.unidades.forEach(u => {
+      u.atividades.forEach(a => {
+        a.status = 'concluida';
+        a.dataConclusao = new Date().toISOString();
+      });
+      u.andamentoTopico = 100;
+      total += u.atividades.length;
+    });
+    disc.totalAtividades = total;
+    disc.atividadesConcluidas = total;
+    disc.andamentoGeral = 100;
+  });
+  saveDisciplinas(list);
+}
+
 export function syncPortalData(aluno: any, disciplinas: Disciplina[]): void {
   if (!isClient()) return;
   initStorage();

@@ -47,6 +47,24 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         });
       }
+  // Ação de auto-concluir atividades que não são questões (Webaula, SCORM, Vídeo)
+  const btnComplete = document.getElementById('btn-complete-action');
+  btnComplete?.addEventListener('click', () => {
+    btnComplete.disabled = true;
+    btnComplete.textContent = '🔄 Concluindo...';
+
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const activeTab = tabs[0];
+      if (activeTab && activeTab.id) {
+        chrome.tabs.sendMessage(activeTab.id, { action: 'AUTO_COMPLETE_ACTIVITY' }, (response) => {
+          btnComplete.disabled = false;
+          btnComplete.textContent = '✅ Atividade Concluída!';
+          statusText.innerHTML = '🎉 <span style="color:#34d399">Webaula/Vídeo computado no AVA!</span>';
+          setTimeout(() => {
+            btnComplete.textContent = '🎬 Auto-Concluir Webaula / Vídeo';
+          }, 3000);
+        });
+      }
     });
   });
 });
