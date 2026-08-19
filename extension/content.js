@@ -329,19 +329,28 @@
       syncBtn.disabled = true;
       syncBtn.innerText = '🔄 Sincronizando...';
 
-      const studentData = getStudentInfo();
-      const discData = scrapeDisciplinas();
-
-      chrome.runtime.sendMessage({
-        action: 'SAVE_DISCIPLINAS',
-        payload: { student: studentData, disciplinas: discData, scrapedAt: new Date().toISOString() }
-      }, () => {
-        syncBtn.disabled = false;
-        syncBtn.innerText = '✅ Sincronizado!';
-        if (statusBox) {
-          statusBox.style.display = 'block';
-          statusBox.innerHTML = `🎉 <strong>${discData.length} matérias</strong> sincronizadas!<br/><a href="https://estudaai.pages.dev/disciplinas" target="_blank">👉 Abrir no EstudaAI</a>`;
+      chrome.storage.local.get(['estudaai_is_logged_in'], (res) => {
+        if (!res.estudaai_is_logged_in) {
+          alert('⚠️ Você não está logado no EstudaAI!\n\nPor favor, faça login ou cadastre-se na plataforma EstudaAI (estudaai.pages.dev) para validar sua licença antes de sincronizar.');
+          syncBtn.disabled = false;
+          syncBtn.innerText = '⚡ Sincronizar com EstudaAI';
+          return;
         }
+
+        const studentData = getStudentInfo();
+        const discData = scrapeDisciplinas();
+
+        chrome.runtime.sendMessage({
+          action: 'SAVE_DISCIPLINAS',
+          payload: { student: studentData, disciplinas: discData, scrapedAt: new Date().toISOString() }
+        }, () => {
+          syncBtn.disabled = false;
+          syncBtn.innerText = '✅ Sincronizado!';
+          if (statusBox) {
+            statusBox.style.display = 'block';
+            statusBox.innerHTML = `🎉 <strong>${discData.length} matérias</strong> sincronizadas!<br/><a href="https://estudaai.pages.dev/disciplinas" target="_blank">👉 Abrir no EstudaAI</a>`;
+          }
+        });
       });
     });
   }

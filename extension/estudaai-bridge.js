@@ -120,4 +120,17 @@
       console.warn('Erro ao salvar atualização no storage da extensão:', e);
     }
   });
+
+  // ============================================================
+  // 5. EXPOR STATUS DE LOGIN PARA A EXTENSÃO
+  // ============================================================
+  function syncLoginStatus() {
+    const isLoggedIn = localStorage.getItem('estudaai_is_logged_in') === 'true';
+    chrome.storage.local.set({ estudaai_is_logged_in: isLoggedIn });
+  }
+
+  window.addEventListener('estudaai_auth_changed', syncLoginStatus);
+  // Sincroniza periodicamente para garantir
+  setInterval(syncLoginStatus, 3000);
+  syncLoginStatus();
 })();

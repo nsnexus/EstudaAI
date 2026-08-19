@@ -1,33 +1,22 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { 
   GraduationCap, 
   Mail, 
   Lock, 
   User as UserIcon, 
   ArrowRight, 
-  ShieldCheck, 
   AlertCircle,
-  CheckCircle2,
-  Zap,
   Loader2
 } from 'lucide-react';
-import { loginUser, registerUser, syncPortalData } from '@/lib/storage';
+import { loginUser, registerUser } from '@/lib/storage';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<'portal' | 'login' | 'register'>('portal');
+  const [tab, setTab] = useState<'login' | 'register'>('login');
   
-  // Portal Connect Form State
-  const [instituicao, setInstituicao] = useState('Anhanguera');
-  const [cpfMatricula, setCpfMatricula] = useState('');
-  const [senhaPortal, setSenhaPortal] = useState('');
-  const [syncStep, setSyncStep] = useState<number>(0);
-  const [syncStepText, setSyncStepText] = useState<string>('');
-
   // Login form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,412 +27,212 @@ export default function LoginPage() {
   const [regCourse, setRegCourse] = useState('Direito');
   const [regSemester, setRegSemester] = useState(5);
   
-  // UI states
-  const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  // Common state
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handlePortalConnectSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-
-    if (!cpfMatricula.trim() || !senhaPortal.trim()) {
-      setError('Por favor, digite seu CPF/Matrícula e a senha do Portal do Aluno.');
-      return;
-    }
-
     setIsLoading(true);
-    setSyncStep(1);
-    setSyncStepText(`1. Verificando credenciais nos servidores da ${instituicao}...`);
-
-    try {
-      const res = await fetch('/api/portal-connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instituicao,
-          cpfMatricula: cpfMatricula.trim(),
-          senha: senhaPortal
-        })
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
+    setError('');
+    
+    setTimeout(() => {
+      const newUser = loginUser(email, regName || email.split('@')[0]);
+      if (newUser) {
+        // Sinaliza para a bridge e extensão que o usuário logou
+        window.dispatchEvent(new Event('estudaai_auth_changed'));
+        localStorage.setItem('estudaai_is_logged_in', 'true');
+        router.push('/');
+      } else {
+        setError('Erro ao realizar login.');
         setIsLoading(false);
-        setSyncStep(0);
-        setError(data.error || 'Credenciais inválidas no portal acadêmico. Verifique seu login e senha.');
-        return;
       }
-
-      // Se autenticado com sucesso na faculdade
-      setSyncStep(2);
-      setSyncStepText('2. Autenticado com sucesso! Mapeando disciplinas...');
-
-      setTimeout(() => {
-        setSyncStep(3);
-        setSyncStepText(`✅ ${data.totalDisciplinas} disciplinas mapeadas! Redirecionando...`);
-        syncPortalData(data.aluno, data.disciplinas);
-        setSuccessMsg(`Bem-vindo(a), ${data.aluno.name}!`);
-        setTimeout(() => router.push('/disciplinas'), 600);
-      }, 700);
-
-    } catch (err) {
-      setIsLoading(false);
-      setSyncStep(0);
-      setError('Falha de conexão com os servidores da instituição. Tente novamente.');
-    }
+    }, 800);
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    if (!email) {
-      setError('Por favor, informe seu e-mail.');
-      return;
-    }
-
     setIsLoading(true);
+    setError('');
+    
     setTimeout(() => {
-      const res = loginUser(email, password);
-      setIsLoading(false);
-      if (res.success) {
-        setSuccessMsg(`Bem-vindo(a), ${res.user?.name}! Redirecionando...`);
-        setTimeout(() => router.push('/disciplinas'), 600);
+      const newUser = registerUser(regName, regEmail, regCourse, regSemester);
+      if (newUser) {
+        window.dispatchEvent(new Event('estudaai_auth_changed'));
+        localStorage.setItem('estudaai_is_logged_in', 'true');
+        router.push('/');
       } else {
-        setError(res.error || 'Erro ao realizar login.');
+        setError('Erro ao criar conta.');
+        setIsLoading(false);
       }
-    }, 400);
-  };
-
-  const handleRegisterSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    if (!regName || !regEmail) {
-      setError('Preencha nome e e-mail.');
-      return;
-    }
-
-    setIsLoading(true);
-    setTimeout(() => {
-      const res = registerUser(regName, regEmail, regCourse, regSemester, 'aluno');
-      setIsLoading(false);
-      if (res.success) {
-        setSuccessMsg(`Conta criada com sucesso! Bem-vindo(a), ${res.user?.name}!`);
-        setTimeout(() => router.push('/disciplinas'), 600);
-      } else {
-        setError(res.error || 'Erro ao criar conta.');
-      }
-    }, 400);
+    }, 800);
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
-      {/* Background glow effects */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-brand-500/10 dark:bg-brand-500/5 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-[300px] h-[300px] bg-primary-500/10 dark:bg-primary-500/5 blur-[100px] rounded-full pointer-events-none" />
+    <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-brand-600/20 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-blue-600/20 rounded-full blur-[100px] pointer-events-none" />
 
-      <div className="w-full max-w-lg relative z-10">
-        
-        {/* Brand Header */}
-        <div className="text-center mb-6">
-          <Link href="/" className="inline-flex items-center gap-2.5 group mb-2">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-brand-600 to-primary-600 text-white shadow-lg shadow-brand-500/25 group-hover:scale-105 transition-transform">
-              <GraduationCap className="h-7 w-7" />
-            </div>
-          </Link>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-surface-900 dark:text-white tracking-tight">
-            Acesse o <span className="text-brand-600 dark:text-brand-400">EstudaAI</span>
-          </h1>
-          <p className="text-xs sm:text-sm text-surface-500 dark:text-surface-400 mt-1">
-            Conecte seu portal acadêmico ou entre com sua conta de estudos
-          </p>
+      <div className="mb-8 text-center z-10">
+        <div className="w-16 h-16 bg-gradient-to-br from-brand-400 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-500/20">
+          <GraduationCap className="w-10 h-10 text-white" />
+        </div>
+        <h1 className="text-3xl font-bold text-white mb-2">Acesse o <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-blue-500">EstudaAI</span></h1>
+        <p className="text-slate-400">Entre com sua conta de estudos</p>
+      </div>
+
+      <div className="w-full max-w-md bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-800 p-8 shadow-2xl z-10 relative">
+        <div className="flex bg-slate-800/50 p-1 rounded-lg mb-8">
+          <button 
+            onClick={() => { setTab('login'); setError(''); }}
+            className={`flex-1 py-2.5 rounded-md text-sm font-medium transition-all ${tab === 'login' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
+          >
+            Entrar
+          </button>
+          <button 
+            onClick={() => { setTab('register'); setError(''); }}
+            className={`flex-1 py-2.5 rounded-md text-sm font-medium transition-all ${tab === 'register' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}
+          >
+            Cadastrar
+          </button>
         </div>
 
-        {/* Auth Card */}
-        <div className="rounded-3xl border border-surface-200 dark:border-surface-800 bg-white/85 dark:bg-surface-900/85 backdrop-blur-xl p-6 sm:p-8 shadow-xl shadow-surface-950/5">
-          
-          {/* Tabs */}
-          <div className="flex rounded-xl bg-surface-100 dark:bg-surface-800/60 p-1 mb-6 text-xs font-semibold">
-            <button
-              onClick={() => { setTab('portal'); setError(null); }}
-              className={`flex-1 py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
-                tab === 'portal'
-                  ? 'bg-gradient-to-r from-brand-600 to-primary-600 text-white shadow-md shadow-brand-500/20 font-bold'
-                  : 'text-surface-600 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white'
-              }`}
-            >
-              <Zap className="h-3.5 w-3.5" />
-              <span>Conectar Portal</span>
-            </button>
-            <button
-              onClick={() => { setTab('login'); setError(null); }}
-              className={`flex-1 py-2.5 rounded-lg transition-all ${
-                tab === 'login'
-                  ? 'bg-white dark:bg-surface-900 text-surface-900 dark:text-white shadow-sm font-bold'
-                  : 'text-surface-500 hover:text-surface-900 dark:hover:text-white'
-              }`}
-            >
-              Entrar E-mail
-            </button>
-            <button
-              onClick={() => { setTab('register'); setError(null); }}
-              className={`flex-1 py-2.5 rounded-lg transition-all ${
-                tab === 'register'
-                  ? 'bg-white dark:bg-surface-900 text-surface-900 dark:text-white shadow-sm font-bold'
-                  : 'text-surface-500 hover:text-surface-900 dark:hover:text-white'
-              }`}
-            >
-              Cadastrar
-            </button>
+        {error && (
+          <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex gap-3 text-red-400 animate-in fade-in slide-in-from-top-2">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <p className="text-sm">{error}</p>
           </div>
+        )}
 
-          {/* Feedback messages */}
-          {error && (
-            <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-red-500/30 bg-red-500/10 p-3.5 text-xs sm:text-sm text-red-600 dark:text-red-400">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              <span>{error}</span>
+        {tab === 'login' && (
+          <form onSubmit={handleLogin} className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">E-mail</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-slate-500" />
+                </div>
+                <input 
+                  type="email" 
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="w-full bg-slate-800/50 border border-slate-700 text-white rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all placeholder:text-slate-600"
+                  placeholder="seu@email.com"
+                  required
+                />
+              </div>
             </div>
-          )}
 
-          {successMsg && (
-            <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs sm:text-sm text-emerald-600 dark:text-emerald-400 animate-pulse">
-              <CheckCircle2 className="h-4 w-4 shrink-0" />
-              <span>{successMsg}</span>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Senha</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-slate-500" />
+                </div>
+                <input 
+                  type="password" 
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  className="w-full bg-slate-800/50 border border-slate-700 text-white rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all placeholder:text-slate-600"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
             </div>
-          )}
 
-          {/* TAB 1: CONECTAR PORTAL ACADÊMICO (ANHANGUERA / UNOPAR / PITÁGORAS) */}
-          {tab === 'portal' && (
-            <form onSubmit={handlePortalConnectSubmit} className="space-y-4">
-              
-              {/* Institution Selector */}
-              <div>
-                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 uppercase tracking-wider mb-1.5">
-                  Instituição de Ensino
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { id: 'Anhanguera', label: 'Anhanguera', color: 'border-amber-500/40 bg-amber-500/5 text-amber-600 dark:text-amber-400' },
-                    { id: 'Unopar', label: 'Unopar', color: 'border-blue-500/40 bg-blue-500/5 text-blue-600 dark:text-blue-400' },
-                    { id: 'Pitágoras', label: 'Pitágoras', color: 'border-emerald-500/40 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400' },
-                    { id: 'Kroton', label: 'Ampli / Fama', color: 'border-purple-500/40 bg-purple-500/5 text-purple-600 dark:text-purple-400' }
-                  ].map((inst) => (
-                    <button
-                      type="button"
-                      key={inst.id}
-                      onClick={() => setInstituicao(inst.id)}
-                      className={`py-2 px-3 rounded-xl border text-xs font-bold text-left transition-all ${
-                        instituicao === inst.id
-                          ? `${inst.color} ring-2 ring-brand-500/30 font-extrabold shadow-sm`
-                          : 'border-surface-200 dark:border-surface-700 text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800'
-                      }`}
-                    >
-                      {instituicao === inst.id ? '✓ ' : ''}{inst.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* CPF / Matrícula */}
-              <div>
-                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 uppercase tracking-wider mb-1.5">
-                  CPF ou Matrícula do Aluno
-                </label>
-                <div className="relative">
-                  <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400" />
-                  <input
-                    type="text"
-                    value={cpfMatricula}
-                    onChange={(e) => setCpfMatricula(e.target.value)}
-                    placeholder="Ex: 01543230000 ou Matrícula"
-                    disabled={isLoading}
-                    className="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/50 pl-10 pr-4 py-2.5 text-sm text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all disabled:opacity-50"
-                  />
-                </div>
-              </div>
-
-              {/* Senha do Portal */}
-              <div>
-                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 uppercase tracking-wider mb-1.5">
-                  Senha do Portal do Aluno (PDA / AVA)
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400" />
-                  <input
-                    type="password"
-                    value={senhaPortal}
-                    onChange={(e) => setSenhaPortal(e.target.value)}
-                    placeholder="••••••••••••"
-                    disabled={isLoading}
-                    className="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/50 pl-10 pr-4 py-2.5 text-sm text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all disabled:opacity-50"
-                  />
-                </div>
-                <p className="text-[11px] text-surface-400 mt-1 flex items-center gap-1">
-                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                  Validação direta em tempo real com os servidores da instituição.
-                </p>
-              </div>
-
-              {/* Animated Progress Steps */}
-              {isLoading && (
-                <div className="p-3.5 rounded-2xl bg-surface-100/80 dark:bg-surface-800/60 border border-surface-200 dark:border-surface-700 space-y-2 animate-in fade-in">
-                  <div className="flex items-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
-                    <Loader2 className="h-4 w-4 animate-spin text-brand-500" />
-                    <span>{syncStepText}</span>
-                  </div>
-                  <div className="w-full bg-surface-200 dark:bg-surface-700 h-1.5 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-brand-500 h-full rounded-full transition-all duration-300"
-                      style={{ width: `${(syncStep / 3) * 100}%` }}
-                    />
-                  </div>
-                </div>
+            <button 
+              type="submit" 
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white rounded-xl py-3.5 font-medium transition-all shadow-lg shadow-brand-500/25 flex justify-center items-center gap-2 group mt-2"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Entrando...</span>
+                </>
+              ) : (
+                <>
+                  <span>Entrar</span>
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </>
               )}
+            </button>
+          </form>
+        )}
 
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full mt-2 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-primary-600 hover:from-brand-500 hover:to-primary-500 text-white font-bold py-3 px-4 shadow-lg shadow-brand-500/25 transition-all active:scale-[0.98] disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Conectando com o Portal...</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap className="h-4 w-4 text-amber-300" />
-                    <span>Conectar e Mapear Minhas Disciplinas</span>
-                  </>
-                )}
-              </button>
-            </form>
-          )}
+        {tab === 'register' && (
+          <form onSubmit={handleRegister} className="space-y-5 animate-in fade-in slide-in-from-left-4 duration-300">
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Nome Completo</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <UserIcon className="h-5 w-5 text-slate-500" />
+                </div>
+                <input 
+                  type="text" 
+                  value={regName}
+                  onChange={e => setRegName(e.target.value)}
+                  className="w-full bg-slate-800/50 border border-slate-700 text-white rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all placeholder:text-slate-600"
+                  placeholder="Seu nome"
+                  required
+                />
+              </div>
+            </div>
 
-          {/* TAB 2: LOGIN TRADICIONAL */}
-          {tab === 'login' && (
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">E-mail</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-slate-500" />
+                </div>
+                <input 
+                  type="email" 
+                  value={regEmail}
+                  onChange={e => setRegEmail(e.target.value)}
+                  className="w-full bg-slate-800/50 border border-slate-700 text-white rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all placeholder:text-slate-600"
+                  placeholder="seu@email.com"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 uppercase tracking-wider mb-1.5">
-                  E-mail do Aluno
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="seu.nome@aluno.anhanguera.edu.br"
-                    className="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/50 pl-10 pr-4 py-2.5 text-sm text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
-                  />
-                </div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Curso</label>
+                <input 
+                  type="text" 
+                  value={regCourse}
+                  onChange={e => setRegCourse(e.target.value)}
+                  className="w-full bg-slate-800/50 border border-slate-700 text-white rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all"
+                  required
+                />
               </div>
-
               <div>
-                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 uppercase tracking-wider mb-1.5">
-                  Senha
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400" />
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/50 pl-10 pr-4 py-2.5 text-sm text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
-                  />
-                </div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Semestre</label>
+                <input 
+                  type="number" 
+                  min="1" max="14"
+                  value={regSemester}
+                  onChange={e => setRegSemester(parseInt(e.target.value))}
+                  className="w-full bg-slate-800/50 border border-slate-700 text-white rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all"
+                  required
+                />
               </div>
+            </div>
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full mt-2 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-primary-600 hover:from-brand-500 hover:to-primary-500 text-white font-semibold py-3 px-4 shadow-lg shadow-brand-500/25 transition-all active:scale-[0.98] disabled:opacity-50"
-              >
-                {isLoading ? 'Conectando...' : 'Acessar Painel de Estudos'}
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </form>
-          )}
-
-          {/* TAB 3: CADASTRO MANUAL */}
-          {tab === 'register' && (
-            <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 uppercase tracking-wider mb-1">
-                  Nome Completo
-                </label>
-                <div className="relative">
-                  <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400" />
-                  <input
-                    type="text"
-                    value={regName}
-                    onChange={(e) => setRegName(e.target.value)}
-                    placeholder="Ex: Narciso Santos"
-                    className="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/50 pl-10 pr-4 py-2 text-sm text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 uppercase tracking-wider mb-1">
-                  E-mail
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400" />
-                  <input
-                    type="email"
-                    value={regEmail}
-                    onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="narciso@aluno.anhanguera.edu.br"
-                    className="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/50 pl-10 pr-4 py-2 text-sm text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 uppercase tracking-wider mb-1">
-                    Curso
-                  </label>
-                  <input
-                    type="text"
-                    value={regCourse}
-                    onChange={(e) => setRegCourse(e.target.value)}
-                    placeholder="Direito"
-                    className="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/50 px-3 py-2 text-sm text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 uppercase tracking-wider mb-1">
-                    Semestre
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={regSemester}
-                    onChange={(e) => setRegSemester(Number(e.target.value))}
-                    className="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/50 px-3 py-2 text-sm text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none transition-all"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full mt-2 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-primary-600 hover:from-brand-500 hover:to-primary-500 text-white font-semibold py-3 px-4 shadow-lg shadow-brand-500/25 transition-all active:scale-[0.98] disabled:opacity-50"
-              >
-                {isLoading ? 'Criando conta...' : 'Criar Conta e Iniciar'}
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </form>
-          )}
-
-        </div>
-
+            <button 
+              type="submit" 
+              disabled={isLoading}
+              className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded-xl py-3.5 font-medium transition-all shadow-lg flex justify-center items-center gap-2 mt-2"
+            >
+              {isLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                'Criar Conta'
+              )}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

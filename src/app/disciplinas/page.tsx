@@ -1016,122 +1016,49 @@ export default function DisciplinasPage() {
               </button>
             </div>
 
-            {/* Error / Success Feedback */}
-            {syncError && (
-              <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{syncError}</span>
+            {/* Extension Prompt Content */}
+            <div className="flex flex-col items-center justify-center py-6 text-center space-y-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-500 mb-2">
+                <Zap className="h-8 w-8" />
               </div>
-            )}
-
-            {syncSuccess && (
-              <div className="mb-4 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-600 dark:text-emerald-400 animate-pulse">
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
-                <span>{syncSuccess}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSyncSubmit} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 uppercase tracking-wider mb-1">
-                  Instituição
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {['Anhanguera', 'Unopar', 'Pitágoras', 'Kroton'].map((inst) => (
-                    <button
-                      type="button"
-                      key={inst}
-                      onClick={() => setInstituicao(inst)}
-                      className={`py-1.5 px-2.5 rounded-lg border text-xs font-bold text-center transition-all ${
-                        instituicao === inst
-                          ? 'border-brand-500 bg-brand-500/10 text-brand-600 dark:text-brand-400 font-extrabold'
-                          : 'border-surface-200 dark:border-surface-700 text-surface-500 hover:bg-surface-50 dark:hover:bg-surface-800'
-                      }`}
-                    >
-                      {instituicao === inst ? '✓ ' : ''}{inst}
-                    </button>
-                  ))}
+              <h3 className="text-xl font-bold text-surface-900 dark:text-white">
+                Sincronização via Extensão
+              </h3>
+              <p className="text-sm text-surface-600 dark:text-surface-400">
+                Para capturar suas disciplinas e o progresso em tempo real do portal da sua faculdade (Anhanguera, Unopar, Pitágoras, etc.), você precisa utilizar nossa extensão.
+              </p>
+              
+              <div className="bg-surface-100 dark:bg-surface-800/50 border border-surface-200 dark:border-surface-700 p-4 rounded-xl text-left w-full mt-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-brand-500 text-white flex items-center justify-center text-xs font-bold mt-0.5">1</div>
+                  <p className="text-sm text-surface-700 dark:text-surface-300">Faça login nesta plataforma (EstudaAI) para validar sua licença.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-brand-500 text-white flex items-center justify-center text-xs font-bold mt-0.5">2</div>
+                  <p className="text-sm text-surface-700 dark:text-surface-300">Abra o portal do seu AVA em outra aba.</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-brand-500 text-white flex items-center justify-center text-xs font-bold mt-0.5">3</div>
+                  <p className="text-sm text-surface-700 dark:text-surface-300">Clique no botão <strong>Sincronizar</strong> que aparecerá no canto inferior da tela do seu AVA.</p>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 uppercase tracking-wider mb-1">
-                  CPF ou Matrícula
-                </label>
-                <div className="relative">
-                  <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400" />
-                  <input
-                    type="text"
-                    value={cpfMatricula}
-                    onChange={(e) => setCpfMatricula(e.target.value)}
-                    placeholder="Ex: 015.432.300-00"
-                    disabled={isSyncing}
-                    className="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/50 pl-10 pr-4 py-2 text-sm text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none transition-all disabled:opacity-50"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 uppercase tracking-wider mb-1">
-                  Senha do Portal (PDA/AVA)
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400" />
-                  <input
-                    type="password"
-                    value={senhaPortal}
-                    onChange={(e) => setSenhaPortal(e.target.value)}
-                    placeholder="••••••••••••"
-                    disabled={isSyncing}
-                    className="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/50 pl-10 pr-4 py-2 text-sm text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none transition-all disabled:opacity-50"
-                  />
-                </div>
-              </div>
-
-              {/* Progress Steps Animation */}
-              {isSyncing && (
-                <div className="p-3 rounded-xl bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 space-y-2">
-                  <div className="flex items-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>{syncStepText}</span>
-                  </div>
-                  <div className="w-full bg-surface-200 dark:bg-surface-700 h-1.5 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-brand-500 h-full rounded-full transition-all duration-300"
-                      style={{ width: `${(syncStep / 4) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2 pt-2">
+              <div className="w-full flex gap-3 mt-6">
                 <button
-                  type="button"
                   onClick={() => setSyncModalOpen(false)}
-                  disabled={isSyncing}
-                  className="flex-1 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 text-xs font-bold text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+                  className="flex-1 py-3 rounded-xl border border-surface-200 dark:border-surface-700 text-sm font-bold text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
                 >
-                  Cancelar
+                  Fechar
                 </button>
-                <button
-                  type="submit"
-                  disabled={isSyncing}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-primary-600 hover:from-brand-500 hover:to-primary-500 text-white text-xs font-bold shadow-md shadow-brand-500/25 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+                <a
+                  href="#"
+                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-brand-600 to-primary-600 hover:from-brand-500 hover:to-primary-500 text-white text-sm font-bold shadow-md shadow-brand-500/25 transition-all flex items-center justify-center gap-2"
                 >
-                  {isSyncing ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      <span>Sincronizando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="h-3.5 w-3.5 text-amber-300" />
-                      <span>Sincronizar Agora</span>
-                    </>
-                  )}
-                </button>
+                  <Zap className="h-4 w-4 text-amber-300" />
+                  <span>Baixar Extensão</span>
+                </a>
               </div>
-            </form>
+            </div>
 
           </div>
         </div>
