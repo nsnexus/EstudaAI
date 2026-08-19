@@ -45,7 +45,7 @@ async function getMoodleLoginToken(loginUrl: string): Promise<{ token: string; c
 
     const html = await res.text();
     const tokenMatch = html.match(/name="logintoken"\s+value="([^"]+)"/);
-    if (!tokenMatch) return null;
+    const token = tokenMatch ? tokenMatch[1] : '';
 
     // getSetCookie() is not available in all Edge environments; parse raw header instead
     const rawSetCookie = res.headers.get('set-cookie') || '';
@@ -55,8 +55,9 @@ async function getMoodleLoginToken(loginUrl: string): Promise<{ token: string; c
       .filter(Boolean)
       .join('; ');
 
-    return { token: tokenMatch[1], cookies };
-  } catch {
+    return { token, cookies };
+  } catch (err) {
+    console.error('getMoodleLoginToken error:', err);
     return null;
   }
 }
@@ -72,12 +73,15 @@ async function authenticateOnMoodle(
   initialCookies: string
 ): Promise<{ success: boolean; sessionCookies: string; redirectUrl?: string }> {
   try {
-    const body = new URLSearchParams({
-      anchor: '',
-      logintoken: loginToken,
+    const bodyParams: Record<string, string> = {
       username: username,
       password: password,
-    });
+    };
+    if (loginToken) {
+      bodyParams.logintoken = loginToken;
+      bodyParams.anchor = '';
+    }
+    const body = new URLSearchParams(bodyParams);
 
     const res = await fetch(loginUrl, {
       method: 'POST',

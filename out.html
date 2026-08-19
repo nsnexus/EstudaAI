@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <title>AVA - Ambiente Virtual de Aprendizagem</title>
+        <!-- Fonts -->
+        <link href="https://fonts.googleapis.com/css?family=Roboto+Slab:400,700&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+        <!-- Style -->
+        <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/7.0.0/normalize.min.css">
+        <link rel="stylesheet" type="text/css" href="https://www.avaeduc.com.br/theme/kroton/login/css/styles.css" />
+        <!-- Icons -->
+                <link rel="shortcut icon" href="https://cm-kls-content.s3.amazonaws.com/LOGOS_MARCAS/MARCAS/favicon-16x16.png" />
+        <!-- Scripts -->
+        <script type="text/javascript" src="../../../lib/jquery/jquery-3.1.0.js"></script> 
+        <script>
+             window.onload = function(){
+                if($(".erroLogin").length > 0){
+                   $("#username").removeAttr("aria-label").removeAttr("aria-invalid");
+                   $("#username").attr("aria-invalid","true");
+                }else{
+                    $("#username").attr("aria-invalid","false");
+                }
+             }
+        </script>
+    
+                                <script>!function(e){var n="https://s.go-mpulse.net/boomerang/";if("False"=="True")e.BOOMR_config=e.BOOMR_config||{},e.BOOMR_config.PageParams=e.BOOMR_config.PageParams||{},e.BOOMR_config.PageParams.pci=!0,n="https://s2.go-mpulse.net/boomerang/";if(window.BOOMR_API_key="T4SAN-XXJDB-425MW-YM3N9-3LLCJ",function(){function e(){if(!i){var e=document.createElement("script");e.id="boomr-scr-as",e.src=window.BOOMR.url,e.async=!0,o.parentNode.appendChild(e),i=!0}}function t(e){i=!0;var n,t,a,r,d=document,O=window;if(window.BOOMR.snippetMethod=e?"if":"i",t=function(e,n){var t=d.createElement("script");t.id=n||"boomr-if-as",t.src=window.BOOMR.url,BOOMR_lstart=(new Date).getTime(),e=e||d.body,e.appendChild(t)},!window.addEventListener&&window.attachEvent&&navigator.userAgent.match(/MSIE [67]\./))return window.BOOMR.snippetMethod="s",void t(o.parentNode,"boomr-async");a=document.createElement("IFRAME"),a.src="about:blank",a.title="",a.role="presentation",a.loading="eager",r=(a.frameElement||a).style,r.width=0,r.height=0,r.border=0,r.display="none",o.parentNode.appendChild(a);try{O=a.contentWindow,d=O.document.open()}catch(_){n=document.domain,a.src="javascript:var d=document.open();d.domain='"+n+"';void(0);",O=a.contentWindow,d=O.document.open()}if(n)d._boomrl=function(){this.domain=n,t()},d.write("<bo"+"dy onload='document._boomrl();'>");else if(O._boomrl=function(){t()},O.addEventListener)O.addEventListener("load",O._boomrl,!1);else if(O.attachEvent)O.attachEvent("onload",O._boomrl);d.close()}function a(e){window.BOOMR_onload=e&&e.timeStamp||(new Date).getTime()}if(!window.BOOMR||!window.BOOMR.version&&!window.BOOMR.snippetExecuted){window.BOOMR=window.BOOMR||{},window.BOOMR.snippetStart=(new Date).getTime(),window.BOOMR.snippetExecuted=!0,window.BOOMR.snippetVersion=12,window.BOOMR.url=n+"T4SAN-XXJDB-425MW-YM3N9-3LLCJ";var o=document.currentScript||document.getElementsByTagName("script")[0],i=!1,r=document.createElement("link");if(r.relList&&"function"==typeof r.relList.supports&&r.relList.supports("preload")&&"as"in r)window.BOOMR.snippetMethod="p",r.href=window.BOOMR.url,r.rel="preload",r.as="script",r.addEventListener("load",e),r.addEventListener("error",function(){t(!0)}),setTimeout(function(){if(!i)t(!0)},3e3),BOOMR_lstart=(new Date).getTime(),o.parentNode.appendChild(r);else t(!1);if(window.addEventListener)window.addEventListener("load",a,!1);else if(window.attachEvent)window.attachEvent("onload",a)}}(),"".length>0)if(e&&"performance"in e&&e.performance&&"function"==typeof e.performance.setResourceTimingBufferSize)e.performance.setResourceTimingBufferSize();!function(){if(BOOMR=e.BOOMR||{},BOOMR.plugins=BOOMR.plugins||{},!BOOMR.plugins.AK){var n=""=="true"?1:0,t="",a="facaylgpafchsjqacqmz4aaadjvilvfk-f-2d161c86a-clienttons-s.akamaihd.net",o="false"=="true"?2:1,i={"ak.v":"41","ak.cp":"1497309","ak.ai":parseInt("943543",10),"ak.ol":"0","ak.cr":48,"ak.ipv":6,"ak.proto":"http/1.1","ak.rid":"9d8d0056","ak.r":52974,"ak.a2":n,"ak.m":"dscb","ak.n":"essl","ak.cport":52289,"ak.gh":"23.12.41.44","ak.quicv":"","ak.tlsv":"tls1.3","ak.0rtt":"","ak.0rtt.ed":"","ak.csrc":"-","ak.acc":"bbr","ak.t":"1787155626","ak.ak":"hOBiQwZUYzCg5VSAfCLimQ==LmjqqXQV78rbSfGp+zB3QzR1k5QdaT7ByD/5MS8Q3+27l1nhS88d4D7i3D56+eHh5cJAo0/j0KoUslNUb0QIiCde4hP29n5x5w9rN40JqTgrYJUuJthAl3VPfa7owtpDKbv11+3BVRs0/BQv5Ss0BnKipP3UM4ZkrmmskfmHozrkYDdcsJwzPy2pORYamsuvlMOuzYNxRHw59ryJMuvK2kmVfpQ7qmu67kq/DAkY0gTeOeVewT7itrwgQguxgASRAi34Nhx6Af7dyRp8cWpX6VE9mup2VbxBP6H4/gwEGuoygCuEiTgmumCheItZ0Kfd1Q233DAo0dYzlH1uPJwYOVNZlmTtphRb5M6PM0vHEEm5RoyM3LZLN3wPKfFd2r97pVL5xxz7mB+8nVQaonzizRsn0SBedS57RyvlBvEC+b0=","ak.pv":"158","ak.dpoabenc":"","ak.tf":o};if(""!==t)i["ak.ruds"]=t;var r={i:!1,av:function(n){var t="http.initiator";if(n&&(!n[t]||"spa_hard"===n[t]))i["ak.feo"]=void 0!==e.aFeoApplied?1:0,BOOMR.addVar(i)},rv:function(){var e=["ak.cport","ak.cr","ak.csrc","ak.gh","ak.ipv","ak.m","ak.n","ak.ol","ak.proto","ak.quicv","ak.tlsv","ak.0rtt","ak.0rtt.ed","ak.r","ak.acc","ak.t","ak.tf"];BOOMR.removeVar(e)}};BOOMR.plugins.AK={akVars:i,akDNSPreFetchDomain:a,init:function(){if(!r.i){var e=BOOMR.subscribe;e("before_beacon",r.av,null,null),e("onbeacon",r.rv,null,null),r.i=!0}return this},is_complete:function(){return!0}}}}()}(window);</script></head>
+
+    <body style="background-image: url('https://cm-kls-202602-storage.s3.amazonaws.com/202602/login/bg.jpg');">
+        <!--<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K4GXW95J" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+    <script
+      src="https://unpkg.com/@grafana/faro-web-sdk@^1.0.0/dist/bundle/faro-web-sdk.iife.js"
+      onload="if (window.init) window.init();"
+    ></script>
+    <script
+      src="https://unpkg.com/@grafana/faro-web-tracing@^1.0.0/dist/bundle/faro-web-tracing.iife.js"
+      onload="if (window.addTracing) window.addTracing();"
+    ></script>-->
+        <!--div id="faixaSup"></div-->
+        <div id="center">
+            <div id="bgLogin">
+                <div class="posicao">
+                    <h1 tabindex="0">Bem-vindo ao Ambiente Virtual de Aprendizagem</h1>
+                    <form method="post" action="../../../login/index.php" id="formLogin" autocomplete="off">
+                        <div class="form-group is-empty">
+                            <input type="text" value="" name="username" id="username" placeholder="Login" class="form-control" aria-required="true" aria-invalid="false">
+                            <span class="bar"></span>
+                        </div>
+                        <div class="form-group">
+                            <input type="password" name="password"  value="" class="form-control" placeholder="Senha" aria-required="true" aria-invalid="false"/>
+                            <span class="bar"></span>
+                        </div>
+                        <button type="submit" class="btn">Entrar</button>
+                    </form>
+                    <!--<div class="AcessInfo">
+                        <a class="infoacesso" href="http://kroton.s3.amazonaws.com/UNIVERSIDADE_KROTON/INFORMACOES_ACESSO/UK_informacoes_acesso.html"><strong>Informações sobre Acesso</strong></a>
+                    </div>-->
+                                        <div id="copyRight" title="Kroton Educacional">Kroton Educacional  &copy; 2017. Todos os direitos reservados.</div>
+                </div>
+            </div>
+        </div>
+
+        <cookie-police-bar />    </body>
+</html>
