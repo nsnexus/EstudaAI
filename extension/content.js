@@ -65,21 +65,30 @@
     return false;
   }
 
-  /**
-   * Coleta todos os links de atividades da página de curso atual do Moodle
-   */
   function coletarAtividadesDoCurso() {
     const atividades = [];
 
-    // Links de atividades do Moodle (mod/*)
-    const links = Array.from(document.querySelectorAll('a[href*="/mod/"]'));
+    // Tenta capturar links padrão do Moodle e também botões/links específicos da Kroton/Anhanguera
+    const links = Array.from(document.querySelectorAll('a[href*="/mod/"], a.activity-link, .activityinstance a, li.activity a, a[href*="id="]'));
     links.forEach(link => {
       const href = link.href || '';
-      const cmidMatch = href.match(/id=(\d+)/);
-      const modMatch = href.match(/\/mod\/([a-z0-9_]+)\//);
+      
+      // Alguns layouts usam viewer.php, view.php, etc.
+      const cmidMatch = href.match(/[?&]id=(\d+)/);
+      let modMatch = href.match(/\/mod\/([a-z0-9_]+)\//);
+      
+      // Se não tem /mod/, mas tem ID de curso e tá dentro de uma lista de atividade, assume que é recurso
+      if (cmidMatch && !modMatch && (link.closest('.activity') || href.includes('scorm') || href.includes('quiz'))) {
+        modMatch = [null, href.includes('quiz') ? 'quiz' : (href.includes('scorm') ? 'scorm' : 'resource')];
+      }
+
       if (cmidMatch && modMatch) {
         const tipo = modMatch[1]; // quiz, scorm, resource, page, forum, etc.
-        const titulo = (link.querySelector('.instancename') || link).innerText.trim().split('\n')[0];
+        const titulo = (link.querySelector('.instancename, .item-title, .activity-title') || link).innerText.trim().split('\n')[0] || `Atividade ${cmidMatch[1]}`;
+        
+        // Evita links de seção inteira ou curso
+        if (href.includes('course/view.php')) return;
+
         atividades.push({
           cmid: cmidMatch[1],
           tipo,
@@ -428,13 +437,32 @@
     }
   }
 
-  /**
-   * AUTO-PILOT COMPLETO DE UMA DISCIPLINA:
-   * Coleta todas as atividades da página do curso e processa cada uma
-   */
   async function autoPilotDisciplina(disciplinaNome) {
+    showToast(`🚀 Iniciando Auto-Pilot para "${disciplinaNome || 'esta disciplina'}". Abrindo tópicos...`);
+    
+    // Tenta expandir todos os tópicos/acordeões antes de ler (Kroton/Moodle carregam via AJAX às vezes)
+    const accordions = document.querySelectorAll('.sectionname a, .toggle, .accordion-toggle, a[data-toggle="collapse"], .accordion-button, .title[data-target]');
+    let toggled = false;
+    accordions.forEach(btn => {
+      if (btn.getAttribute('aria-expanded') !== 'true' && !btn.classList.contains('collapsed') === false) {
+        try { btn.click(); toggled = true; } catch(e){}
+      }
+    });
+
+    if (toggled) {
+      await new Promise(r => setTimeout(r, 2000)); // Espera carregar o AJAX/Animação
+    }
+
     const atividades = coletarAtividadesDoCurso();
-    showToast(`🚀 Auto-Pilot iniciado: ${atividades.length} atividades encontradas para "${disciplinaNome || 'esta disciplina'}"`);
+    
+    if (atividades.length === 0) {
+      showToast(`⚠️ Nenhuma atividade encontrada no DOM. Talvez o layout da Anhanguera tenha mudado. Tentando forçar scroll...`);
+      window.scrollTo(0, document.body.scrollHeight);
+      await new Promise(r => setTimeout(r, 2000));
+      atividades.push(...coletarAtividadesDoCurso());
+    }
+
+    showToast(`🔍 ${atividades.length} atividades encontradas para processamento.`);
     
     let concluidas = 0;
     
