@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { MathRenderer } from '@/components/MathRenderer';
-import { MOCK_SAMPLE_QUESTIONS } from '@/lib/mock-data';
+import { SAMPLE_QUESTIONS } from '@/lib/personas';
 import { generateTutorResponse, evaluateStudentReflection } from '@/lib/tutor-engine';
 import { TutorResponse } from '@/types';
 
@@ -44,7 +44,7 @@ export default function LandingPage() {
     setReflectionFeedback(null);
     setStudentReflection('');
 
-    const sample = MOCK_SAMPLE_QUESTIONS[index];
+    const sample = SAMPLE_QUESTIONS[index];
     const response = await generateTutorResponse({
       question: sample.question,
       discipline: sample.discipline,
@@ -61,7 +61,7 @@ export default function LandingPage() {
 
     setIsEvaluating(true);
     const result = await evaluateStudentReflection(
-      MOCK_SAMPLE_QUESTIONS[selectedDemoIndex].question,
+      SAMPLE_QUESTIONS[selectedDemoIndex].question,
       demoResponse,
       studentReflection
     );
@@ -168,7 +168,7 @@ export default function LandingPage() {
 
             {/* Quick Sample Selector */}
             <div className="flex flex-wrap gap-2">
-              {MOCK_SAMPLE_QUESTIONS.map((sample, idx) => (
+              {SAMPLE_QUESTIONS.map((sample, idx) => (
                 <button
                   key={sample.title}
                   onClick={() => handleRunDemo(idx)}
@@ -188,12 +188,12 @@ export default function LandingPage() {
           <div className="mt-6 rounded-2xl bg-surface-100/70 dark:bg-surface-950/60 p-5 border border-surface-200/80 dark:border-surface-800">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-brand-600 dark:text-brand-400 uppercase tracking-wider">
-                {MOCK_SAMPLE_QUESTIONS[selectedDemoIndex].discipline} • {MOCK_SAMPLE_QUESTIONS[selectedDemoIndex].title}
+                {SAMPLE_QUESTIONS[selectedDemoIndex].discipline} • {SAMPLE_QUESTIONS[selectedDemoIndex].title}
               </span>
               <span className="text-xs text-surface-500 font-medium">Entrada do Aluno</span>
             </div>
             <p className="mt-2 text-sm sm:text-base font-medium text-surface-800 dark:text-surface-100 leading-relaxed">
-              &ldquo;{MOCK_SAMPLE_QUESTIONS[selectedDemoIndex].question}&rdquo;
+              &ldquo;{SAMPLE_QUESTIONS[selectedDemoIndex].question}&rdquo;
             </p>
             
             {!demoResponse && !isGenerating && (

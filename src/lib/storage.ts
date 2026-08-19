@@ -1,7 +1,7 @@
 'use client';
 
 import { User, StudySession, Flashcard, TutorPersona, AdminMetrics, UserRole, Disciplina } from '@/types';
-import { MOCK_PERSONAS, INITIAL_ADMIN_METRICS } from './mock-data';
+import { TUTOR_PERSONAS } from './personas';
 
 const STORAGE_KEYS = {
   CURRENT_USER: 'estudaai_current_user',
@@ -38,11 +38,7 @@ export function initStorage() {
   }
 
   if (!localStorage.getItem(STORAGE_KEYS.PERSONAS)) {
-    localStorage.setItem(STORAGE_KEYS.PERSONAS, JSON.stringify(MOCK_PERSONAS));
-  }
-
-  if (!localStorage.getItem(STORAGE_KEYS.METRICS)) {
-    localStorage.setItem(STORAGE_KEYS.METRICS, JSON.stringify(INITIAL_ADMIN_METRICS));
+    localStorage.setItem(STORAGE_KEYS.PERSONAS, JSON.stringify(TUTOR_PERSONAS));
   }
 
   if (!localStorage.getItem(STORAGE_KEYS.AI_CONFIG)) {
@@ -432,10 +428,10 @@ export function deleteFlashcard(id: string): void {
  * Personas de Tutoria
  */
 export function getTutorPersonas(): TutorPersona[] {
-  if (!isClient()) return MOCK_PERSONAS;
+  if (!isClient()) return TUTOR_PERSONAS;
   initStorage();
   const raw = localStorage.getItem(STORAGE_KEYS.PERSONAS);
-  return raw ? JSON.parse(raw) : MOCK_PERSONAS;
+  return raw ? JSON.parse(raw) : TUTOR_PERSONAS;
 }
 
 export function updateTutorPersona(persona: TutorPersona): void {
@@ -453,11 +449,22 @@ export function updateTutorPersona(persona: TutorPersona): void {
 /**
  * Métricas Administrativas & Integridade
  */
+const EMPTY_ADMIN_METRICS: AdminMetrics = {
+  totalSessions: 0,
+  totalQuestionsAnswered: 0,
+  integrityBlocksCount: 0,
+  activeUsers: 0,
+  autonomyRate: 0,
+  topDisciplines: [],
+  sessionsByDay: [],
+  recentIntegrityLogs: []
+};
+
 export function getAdminMetrics(): AdminMetrics {
-  if (!isClient()) return INITIAL_ADMIN_METRICS;
+  if (!isClient()) return EMPTY_ADMIN_METRICS;
   initStorage();
   const raw = localStorage.getItem(STORAGE_KEYS.METRICS);
-  return raw ? JSON.parse(raw) : INITIAL_ADMIN_METRICS;
+  return raw ? JSON.parse(raw) : EMPTY_ADMIN_METRICS;
 }
 
 export function recordIntegrityIntervention(userName?: string, discipline?: string, query?: string): void {

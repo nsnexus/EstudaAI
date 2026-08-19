@@ -31,7 +31,6 @@ import {
   getStudySessions, 
   getCurrentUser 
 } from '@/lib/storage';
-import { INITIAL_QUIZ_QUESTIONS } from '@/lib/mock-data';
 import { Flashcard, StudySession, QuizQuestion, User } from '@/types';
 
 export default function BibliotecaPage() {
@@ -53,7 +52,7 @@ export default function BibliotecaPage() {
   const [newBack, setNewBack] = useState('');
 
   // Simulados state
-  const [quizQuestions] = useState<QuizQuestion[]>(INITIAL_QUIZ_QUESTIONS);
+  const [quizQuestions] = useState<QuizQuestion[]>([]);
   const [selectedAnswers, setSelectedAnswers] = useState<{ [questionId: string]: string }>({});
   const [revealedExplanations, setRevealedExplanations] = useState<{ [questionId: string]: boolean }>({});
   const [revealedHints, setRevealedHints] = useState<{ [questionId: string]: boolean }>({});

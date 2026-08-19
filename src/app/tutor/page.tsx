@@ -34,7 +34,7 @@ import {
 } from '@/lib/storage';
 import { generateTutorResponse, evaluateStudentReflection } from '@/lib/tutor-engine';
 import { TutorPersona, TutorResponse, StudySession, User, ChatMessage } from '@/types';
-import { MOCK_SAMPLE_QUESTIONS } from '@/lib/mock-data';
+import { SAMPLE_QUESTIONS } from '@/lib/personas';
 
 export default function TutorPage() {
   const [user, setUser] = useState<User | null>(null);
