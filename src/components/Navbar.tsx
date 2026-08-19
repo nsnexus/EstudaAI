@@ -23,6 +23,9 @@ import {
 } from 'lucide-react';
 import { getCurrentUser, switchRole, logoutUser } from '@/lib/storage';
 import { User, UserRole } from '@/types';
+import { auth, db } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
 export const Navbar: React.FC = () => {
   const pathname = usePathname();
@@ -32,10 +35,6 @@ export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    // Inicializa o usuário
-    const currentUser = getCurrentUser();
-    setUser(currentUser);
-
     // Inicializa tema
     const isDarkMode = document.documentElement.classList.contains('dark') ||
       window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -44,12 +43,26 @@ export const Navbar: React.FC = () => {
       document.documentElement.classList.add('dark');
     }
 
-    const handleAuthChange = () => {
-      setUser(getCurrentUser());
-    };
+    // Firebase Auth Listener
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            setUser(userDoc.data() as User);
+          } else {
+            setUser(null);
+          }
+        } catch (error) {
+          console.error("Erro ao buscar dados do usuário:", error);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+    });
 
-    window.addEventListener('estudaai_auth_changed', handleAuthChange);
-    return () => window.removeEventListener('estudaai_auth_changed', handleAuthChange);
+    return () => unsubscribe();
   }, []);
 
   const toggleTheme = () => {
