@@ -70,12 +70,9 @@
       }
     }
 
-    // Recebe resultado do Auto-Pilot e atualiza o painel
-    if (request.action === 'AUTOPILOT_DONE') {
-      const { concluidas, total, disciplinaNome } = request.payload || {};
-      window.dispatchEvent(new CustomEvent('estudaai_autopilot_done', {
-        detail: { concluidas, total, disciplinaNome }
-      }));
+    // (Opcional) Recebe mensagens de progresso se houver
+    if (request.action === 'AUTOPILOT_PROGRESS') {
+      // Ignorado no MVP
     }
   });
 
@@ -85,23 +82,23 @@
   // O bridge captura e envia para o background que executa no AVA
   // ============================================================
   window.addEventListener('estudaai_autopilot_command', (event) => {
-    const { task, disciplinaId, disciplinaNome } = event.detail || {};
+    const { task, disciplinaId, disciplinaNome, url, disciplinasPendentes } = event.detail || {};
     console.log(`🤖 EstudaAI Bridge: Recebeu comando Auto-Pilot: task=${task}, disciplina=${disciplinaNome}`);
 
     chrome.runtime.sendMessage({
       action: 'AUTOPILOT_EXECUTE',
-      payload: { task, disciplinaId, disciplinaNome }
+      payload: { task, disciplinaId, disciplinaNome, url, disciplinasPendentes }
     }, (response) => {
       if (chrome.runtime.lastError) {
         console.error('Erro ao executar Auto-Pilot:', chrome.runtime.lastError.message);
         window.dispatchEvent(new CustomEvent('estudaai_autopilot_error', {
-          detail: { error: 'Portal AVA não está aberto. Abra o AVA em outra aba primeiro.' }
+          detail: { error: 'Erro de comunicação com a extensão.' }
         }));
         return;
       }
-      console.log('✅ Auto-Pilot iniciado no AVA:', response);
-      window.dispatchEvent(new CustomEvent('estudaai_autopilot_started', {
-        detail: { task, disciplinaNome, response }
+      console.log('✅ Auto-Pilot concluído pelo background:', response);
+      window.dispatchEvent(new CustomEvent('estudaai_autopilot_done', {
+        detail: response
       }));
     });
   });

@@ -461,12 +461,6 @@
     }
 
     showToast(`✅ Auto-Pilot concluído! ${concluidas}/${atividades.length} atividades marcadas no AVA.`);
-    
-    // Notifica o painel web
-    chrome.runtime.sendMessage({
-      action: 'AUTOPILOT_DONE',
-      payload: { concluidas, total: atividades.length, disciplinaNome }
-    });
 
     return { concluidas, total: atividades.length };
   }

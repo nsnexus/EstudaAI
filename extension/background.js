@@ -63,12 +63,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   // ============================================================
   // EXECUTAR AUTOMAÇÃO REAL NO AVA (chamado pelo painel web)
-  // Encontra a aba do AVA aberta e injeta o comando
   // ============================================================
   if (request.action === 'AUTOPILOT_EXECUTE') {
-    const { task, disciplinaId, disciplinaNome } = request.payload;
+    const { task, disciplinaId, disciplinaNome, url, disciplinasPendentes } = request.payload;
 
-    // Procura aba do AVA aberta
+    // Lógica 100% Autônoma: Múltiplas disciplinas
+    if (task === 'complete_all' && disciplinasPendentes && disciplinasPendentes.length > 0) {
+      executeAllAutonomous(disciplinasPendentes, sendResponse);
+      return true; // Keep message channel open
+    }
+
+    // Lógica 100% Autônoma: Disciplina única
+    if (task === 'complete_discipline' && url) {
+      executeDisciplineAutonomous(url, disciplinaNome, sendResponse);
+      return true; // Keep message channel open
+    }
+
+    // Fallback original: Procura aba do AVA aberta
     chrome.tabs.query({
       url: [
         'https://*.avaeduc.com.br/*',
@@ -88,13 +99,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
 
       const avaTab = tabs[0];
-
-      // Injeta content.js caso não esteja rodando
       chrome.scripting.executeScript({
         target: { tabId: avaTab.id },
         files: ['content.js']
       }, () => {
-        // Manda o comando para o content script na aba do AVA
         chrome.tabs.sendMessage(avaTab.id, {
           action: 'AUTOPILOT_EXECUTE',
           task: task,
@@ -115,7 +123,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const { url, task } = request.payload;
 
     chrome.tabs.create({ url: url, active: false }, (tab) => {
-      // Aguarda a aba carregar antes de injetar
       const listener = (tabId, changeInfo) => {
         if (tabId === tab.id && changeInfo.status === 'complete') {
           chrome.tabs.onUpdated.removeListener(listener);
@@ -138,3 +145,59 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 });
+
+// Helper: Executa uma disciplina em aba temporária e depois fecha
+function executeDisciplineAutonomous(url, disciplinaNome, sendResponse) {
+  chrome.tabs.create({ url: url, active: false }, (tab) => {
+    const listener = (tabId, changeInfo) => {
+      if (tabId === tab.id && changeInfo.status === 'complete') {
+        chrome.tabs.onUpdated.removeListener(listener);
+        
+        // Dá um pequeno tempo para a página terminar renderização JS pesada
+        setTimeout(() => {
+          chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content.js']
+          }, () => {
+            // Envia o comando
+            chrome.tabs.sendMessage(tab.id, {
+              action: 'AUTOPILOT_EXECUTE',
+              task: 'complete_discipline',
+              disciplinaNome: disciplinaNome
+            }, (response) => {
+              // Resposta recebida, fecha a aba e responde pro EstudaAI
+              chrome.tabs.remove(tab.id);
+              sendResponse(response || { success: true, concluidas: 0, total: 0 });
+            });
+          });
+        }, 2000);
+      }
+    };
+    chrome.tabs.onUpdated.addListener(listener);
+  });
+}
+
+// Helper: Executa um array de disciplinas sequencialmente
+async function executeAllAutonomous(disciplinasPendentes, sendResponse) {
+  let totalConcluidas = 0;
+  let totalAtividades = 0;
+
+  for (const disc of disciplinasPendentes) {
+    if (!disc.url) continue;
+    
+    // Aguarda a promessa da execução de cada disciplina
+    const result = await new Promise((resolve) => {
+      executeDisciplineAutonomous(disc.url, disc.nome, resolve);
+    });
+
+    if (result && result.success) {
+      totalConcluidas += result.concluidas || 0;
+      totalAtividades += result.total || 0;
+    }
+    
+    // Pequeno delay entre disciplinas
+    await new Promise(r => setTimeout(r, 1000));
+  }
+
+  sendResponse({ success: true, concluidas: totalConcluidas, total: totalAtividades });
+}

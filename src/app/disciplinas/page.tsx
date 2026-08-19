@@ -136,7 +136,8 @@ export default function DisciplinasPage() {
         detail: {
           task: 'complete_discipline',
           disciplinaId: disciplina.id,
-          disciplinaNome: disciplina.nome
+          disciplinaNome: disciplina.nome,
+          url: disciplina.moodleCourseUrl
         }
       }));
 
@@ -215,10 +216,14 @@ export default function DisciplinasPage() {
 
     clearAutoPilotTimeouts();
 
+    const disciplinasPendentes = disciplinas
+      .filter(d => d.andamentoGeral < 100)
+      .map(d => ({ id: d.id, nome: d.nome, url: d.moodleCourseUrl }));
+
     // Dispara o comando REAL para o AVA via extensão
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('estudaai_autopilot_command', {
-        detail: { task: 'complete_all', disciplinaId: null, disciplinaNome: 'Todas as Disciplinas' }
+        detail: { task: 'complete_all', disciplinaId: null, disciplinaNome: 'Todas as Disciplinas', disciplinasPendentes }
       }));
 
       const onError = (ev: Event) => {

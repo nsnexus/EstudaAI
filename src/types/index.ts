@@ -50,6 +50,8 @@ export type CategoriaDisciplina = 'AMI' | 'DI' | 'Extensao' | 'Complementar';
 export interface Disciplina {
   id: string;
   codigo?: string;
+  moodleCourseId?: string;
+  moodleCourseUrl?: string;
   nome: string;
   categoria: CategoriaDisciplina;
   categoriaLabel: string;
