@@ -35,3 +35,7 @@ next-env.d.ts
 # ide
 .claude/
 
+# debug page dumps (podem conter sessão/token real do portal)
+/*.html
+!extension/*.html
+
