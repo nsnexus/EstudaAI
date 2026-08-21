@@ -207,24 +207,43 @@
           return text.replace(/\n/g, ' ').trim() || 'Alternativa ' + radio.value;
         });
 
-        if (statusEl) statusEl.innerHTML = `🧠 [Questão ${i + 1}/${questions.length}] Resolvendo com IA...`;
+        if (statusEl) statusEl.innerHTML = `🧠 [Questão ${i + 1}/${questions.length}] Resolvendo...`;
         q.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
         try {
+          // 1. Tenta buscar do Cache primeiro
+          const { estudaai_quiz_cache = {} } = await chrome.storage.local.get('estudaai_quiz_cache');
+          const cachedAnswer = estudaai_quiz_cache[qText];
           let data = null;
-          const endpoints = [
-            'http://localhost:3000/api/solve-quiz',
-            'https://estudaai.pages.dev/api/solve-quiz'
-          ];
-          for (const url of endpoints) {
-            try {
-              const res = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question: qText, options: answerLabels, discipline: disciplineName, provider: 'openai' })
-              });
-              if (res.ok) { data = await res.json(); break; }
-            } catch (_) {}
+          let usedCache = false;
+
+          if (cachedAnswer) {
+            // Procura o índice da alternativa que mais se aproxima da resposta do cache
+            const cIdx = answerLabels.findIndex(l => l.includes(cachedAnswer) || cachedAnswer.includes(l));
+            if (cIdx !== -1) {
+              data = { correctIndex: cIdx };
+              usedCache = true;
+              console.log(`⚡ Usando resposta do cache para a Questão ${i + 1}!`);
+            }
+          }
+
+          // 2. Se não tem no cache, pede para a IA
+          if (!usedCache) {
+            if (statusEl) statusEl.innerHTML = `🧠 [Questão ${i + 1}/${questions.length}] Consultando IA...`;
+            const endpoints = [
+              'http://localhost:3000/api/solve-quiz',
+              'https://estudaai.pages.dev/api/solve-quiz'
+            ];
+            for (const url of endpoints) {
+              try {
+                const res = await fetch(url, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ question: qText, options: answerLabels, discipline: disciplineName, provider: 'openai' })
+                });
+                if (res.ok) { data = await res.json(); break; }
+              } catch (_) {}
+            }
           }
 
           const cIdx = data ? parseInt(data.correctIndex, 10) : NaN;
@@ -1317,9 +1336,73 @@
   });
 
   // ============================================================
-  // 6. AUTO-EXECUÇÃO AO CARREGAR A PÁGINA
+  // 6. MELHORIAS (Cache, Login, Termos) E AUTO-EXECUÇÃO
   // ============================================================
+  function detectLoginOrError() {
+    // Tela de login ou expirada
+    const bodyText = document.body.innerText || '';
+    if (document.querySelector('input[type="password"]') || window.location.hostname.includes('login.') || bodyText.includes('Sessão expirada') || bodyText.includes('Você não está logado')) {
+      showToast('⚠️ Sessão expirada ou Tela de Login detectada. Automação pausada.', 10000);
+      return true;
+    }
+    return false;
+  }
+
+  function autoAcceptTerms() {
+    if (window.location.hostname.includes('termo.kroton') || window.location.hostname.includes('termos')) {
+      const btns = document.querySelectorAll('button, input[type="button"], input[type="submit"], a.btn');
+      for (const btn of btns) {
+        const text = (btn.value || btn.innerText || '').toLowerCase();
+        if (text.includes('aceitar') || text.includes('concordo') || text.includes('aceito')) {
+          btn.click();
+          console.log('✅ Termos de Uso aceitos automaticamente!');
+          showToast('✅ Termos de Uso aceitos automaticamente!');
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  async function cacheCorrectAnswersFromReview() {
+    // Só atua se estiver na página de revisão do questionário
+    if (!window.location.href.includes('review.php') && !document.querySelector('.quizreviewsummary')) return;
+    
+    const questions = document.querySelectorAll('.que');
+    if (questions.length === 0) return;
+    
+    const { estudaai_quiz_cache = {} } = await chrome.storage.local.get('estudaai_quiz_cache');
+    let updated = false;
+
+    questions.forEach(q => {
+      let qText = q.querySelector('.qtext')?.innerText?.trim();
+      if (!qText) return;
+      
+      let rightAnswerText = q.querySelector('.rightanswer')?.innerText?.replace('A resposta correta é:', '')?.trim();
+      
+      if (!rightAnswerText) {
+         const correctOption = q.querySelector('.answer .correct');
+         if (correctOption) rightAnswerText = correctOption.innerText.trim();
+      }
+      
+      if (qText && rightAnswerText) {
+        estudaai_quiz_cache[qText] = rightAnswerText;
+        updated = true;
+      }
+    });
+
+    if (updated) {
+      await chrome.storage.local.set({ estudaai_quiz_cache });
+      console.log('✅ Gabarito salvo em cache com sucesso!');
+    }
+  }
+
   function init() {
+    if (detectLoginOrError()) return; // Se for login, não inicia robô
+    if (autoAcceptTerms()) return;    // Se for tela de termos, aceita e espera
+    
+    cacheCorrectAnswersFromReview();  // Salva o gabarito se estiver na tela de revisão
+
     checkAndSolveQuizQuestions(); // Resolve questões automaticamente se for página de quiz
     renderFloatingWidget();       // Mostra o widget de sincronização
     autoCompleteNonQuizActivities(); // Conclui SCORM/vídeo automaticamente
