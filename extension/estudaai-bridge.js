@@ -152,7 +152,15 @@
   // ============================================================
   function syncLoginStatus() {
     const isLoggedIn = localStorage.getItem('estudaai_is_logged_in') === 'true';
-    chrome.storage.local.set({ estudaai_is_logged_in: isLoggedIn });
+    let userName = '';
+    try {
+      const user = JSON.parse(localStorage.getItem('estudaai_current_user'));
+      if (user && user.name) userName = user.name;
+    } catch(e) {}
+    chrome.storage.local.set({ 
+      estudaai_is_logged_in: isLoggedIn,
+      estudaai_user_name: userName
+    });
   }
 
   window.addEventListener('estudaai_auth_changed', syncLoginStatus);

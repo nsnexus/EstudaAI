@@ -1087,7 +1087,7 @@
     // Só exibe o widget se o aluno estiver realmente logado (nome identificado)
     if (student.name === 'Estudante') return;
 
-    chrome.storage.local.get(['estudaai_is_logged_in'], (res) => {
+    chrome.storage.local.get(['estudaai_is_logged_in', 'estudaai_user_name'], (res) => {
       const isLoggedIn = !!res.estudaai_is_logged_in;
       const widget = document.createElement('div');
       widget.id = 'estudaai-floating-widget';
@@ -1119,6 +1119,19 @@
         if (!isLoggedIn) {
           window.open('https://estudaai.pages.dev/login', '_blank');
           return;
+        }
+
+        const studentData = getStudentInfo();
+        const portalName = studentData.name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const estudaaiName = (res.estudaai_user_name || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+        if (portalName && estudaaiName && portalName !== 'estudante') {
+           const portalFirst = portalName.split(' ')[0];
+           const estudaaiFirst = estudaaiName.split(' ')[0];
+           if (portalFirst !== estudaaiFirst) {
+               alert('⚠️ Atenção!\n\nO aluno logado no EstudaAI (' + (res.estudaai_user_name || 'Desconhecido') + ') é diferente do aluno logado no AVA (' + studentData.name + ').\n\nPor favor, acesse o painel do EstudaAI e faça login com a conta correta antes de sincronizar.');
+               return;
+           }
         }
 
         syncBtn.disabled = true;
@@ -1354,24 +1367,35 @@
     if (request.action === 'AUTOPILOT_EXECUTE') {
       const { task, disciplinaId, disciplinaNome } = request;
 
-      if (task === 'complete_all' || task === 'complete_discipline') {
-        autoPilotDisciplina(disciplinaNome, request.visitedCmids || []).then(result => sendResponse({ success: true, ...result }));
-        return true;
-      }
+      chrome.storage.local.get(['estudaai_user_name'], (res) => {
+        const studentData = getStudentInfo();
+        const portalName = studentData.name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const estudaaiName = (res.estudaai_user_name || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-      if (task === 'solve_quiz') {
-        checkAndSolveQuizQuestions().then(() => sendResponse({ success: true }));
-        return true;
-      }
+        if (portalName && estudaaiName && portalName !== 'estudante') {
+           const portalFirst = portalName.split(' ')[0];
+           const estudaaiFirst = estudaaiName.split(' ')[0];
+           if (portalFirst !== estudaaiFirst) {
+               alert('⚠️ Segurança EstudaAI\n\nO aluno logado no EstudaAI (' + (res.estudaai_user_name || 'Desconhecido') + ') é diferente do aluno logado no AVA (' + studentData.name + ').\n\nO Auto-Pilot foi CANCELADO para evitar que atividades sejam feitas na conta de terceiros.');
+               sendResponse({ success: false, error: 'Conta do AVA incompatível com a do EstudaAI.' });
+               return;
+           }
+        }
 
-      if (task === 'complete_activity' || task === 'complete_single') {
-        autoCompleteNonQuizActivities().then(() => {
-          sendResponse({ success: true });
-          // Fecha a aba depois de um tempinho pra não acumular
-          setTimeout(() => chrome.runtime.sendMessage({ action: 'CLOSE_TAB' }), 2500);
-        });
-        return true;
-      }
+        if (task === 'complete_all' || task === 'complete_discipline') {
+          autoPilotDisciplina(disciplinaNome, request.visitedCmids || []).then(result => sendResponse({ success: true, ...result }));
+        } else if (task === 'solve_quiz') {
+          checkAndSolveQuizQuestions().then(() => sendResponse({ success: true }));
+        } else if (task === 'complete_activity' || task === 'complete_single') {
+          autoCompleteNonQuizActivities().then(() => {
+            sendResponse({ success: true });
+            // Fecha a aba depois de um tempinho pra não acumular
+            setTimeout(() => chrome.runtime.sendMessage({ action: 'CLOSE_TAB' }), 2500);
+          });
+        }
+      });
+
+      return true;
     }
   });
 
