@@ -109,6 +109,16 @@
         // Evita links de seção inteira ou curso
         if (href.includes('course/view.php')) return;
 
+        // Pular se já estiver concluída visualmente (não perde tempo reabrindo)
+        const container = link.closest('.activity, li, div.activity-item, .activityinstance, .card-atividade, .box-atividade') || link.parentElement;
+        if (container) {
+          const text = container.innerText.toLowerCase();
+          const hasCheck = container.querySelector('.icon-check, .text-success, [alt*="onclu"], [alt*="Conclu"], .completion-manual-y, i.fa-check, .badge-success, .icon-check_circle');
+          if (hasCheck || text.includes('concluído') || text.includes('feito') || text.includes('100%')) {
+            return; // Já está concluída, ignora
+          }
+        }
+
         atividades.push({
           cmid: cmidMatch[1],
           tipo,
