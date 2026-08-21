@@ -12,6 +12,26 @@
   'use strict';
   console.log('🚀 EstudaAI Conector & Auto-Pilot carregado no portal acadêmico!');
 
+  /**
+   * Roda fn(item) para cada item de `items`, mas no máximo `limit` de cada vez.
+   * Evita abrir dezenas de iframes ocultos simultâneos (uma matéria com 8 unidades
+   * x 3 módulos = até 24 de uma vez sem isso), o que sobrecarrega o navegador e
+   * faz fetches falharem silenciosamente sob pressão de recursos.
+   */
+  async function mapWithConcurrency(items, limit, fn) {
+    const results = new Array(items.length);
+    let nextIndex = 0;
+    async function worker() {
+      while (nextIndex < items.length) {
+        const idx = nextIndex++;
+        results[idx] = await fn(items[idx], idx);
+      }
+    }
+    const workers = Array.from({ length: Math.min(limit, items.length) }, worker);
+    await Promise.all(workers);
+    return results;
+  }
+
   // ============================================================
   // UTILIDADES: MOODLE SESSION KEY & CMID
   // ============================================================
@@ -117,9 +137,12 @@
   async function checkAndSolveQuizQuestions() {
     const questions = Array.from(document.querySelectorAll('.que.multichoice, .que, .formulation'));
     const isQuizPage = window.location.href.includes('/mod/quiz/') || questions.length > 0;
+    
+    // Verifica se estamos em uma página de tentativa (onde é possível responder)
+    const canAnswer = document.querySelectorAll('input[type="radio"]:not([disabled])').length > 0;
 
-    if (questions.length > 0) {
-      console.log(`🎯 EstudaAI Auto-Pilot: Detectadas ${questions.length} questões na página.`);
+    if (questions.length > 0 && canAnswer) {
+      console.log(`🎯 EstudaAI Auto-Pilot: Detectadas ${questions.length} questões ativas na página.`);
 
       // HUD visual
       let hud = document.getElementById('estudaai-quiz-hud');
@@ -148,11 +171,41 @@
 
       for (let i = 0; i < questions.length; i++) {
         const q = questions[i];
-        const qText = q.querySelector('.qtext')?.innerText?.trim() || 'Questão';
-        const radioInputs = Array.from(q.querySelectorAll('.answer input[type="radio"]'));
-        const answerLabels = Array.from(q.querySelectorAll('.answer label, .answer .flex-fill, .answer div'))
-          .map(el => el.innerText.trim())
-          .filter(t => t.length > 1 && !t.toLowerCase().startsWith('limpar'));
+        let qText = q.querySelector('.qtext')?.innerText?.trim() || 'Questão';
+        
+        // Extrai imagens da pergunta (útil se a imagem tiver texto alternativo descritivo)
+        q.querySelectorAll('.qtext img').forEach(img => {
+          if (img.alt) qText += `\n[Descrição da Imagem: ${img.alt}]`;
+          else if (img.src) qText += `\n[Link da Imagem: ${img.src}]`;
+        });
+
+        const radioInputs = Array.from(q.querySelectorAll('.answer input[type="radio"]:not([disabled])'));
+        
+        // Pula a questão se não houver opções selecionáveis
+        if (radioInputs.length === 0) continue;
+
+        // Extrai o texto da alternativa de forma garantida 1:1 com os radio buttons
+        const answerLabels = radioInputs.map(radio => {
+          let text = '';
+          const container = radio.closest('.r0, .r1, .d-flex') || radio.parentElement;
+          
+          if (radio.id) {
+            const labelEl = q.querySelector(`label[for="${radio.id}"]`);
+            if (labelEl) text = labelEl.innerText.trim();
+          }
+          if (!text && container) {
+            text = container.innerText.trim();
+          }
+          
+          // Tratamento para alternativas que são apenas imagens (comum na Kroton)
+          if (!text && container) {
+            const img = container.querySelector('img');
+            if (img && img.alt) text = `[Imagem: ${img.alt}]`;
+            else if (img && img.src) text = `[Imagem: ${img.src}]`;
+          }
+
+          return text.replace(/\n/g, ' ').trim() || 'Alternativa ' + radio.value;
+        });
 
         if (statusEl) statusEl.innerHTML = `🧠 [Questão ${i + 1}/${questions.length}] Resolvendo com IA...`;
         q.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -174,9 +227,21 @@
             } catch (_) {}
           }
 
-          if (data && typeof data.correctIndex === 'number' && radioInputs[data.correctIndex]) {
-            radioInputs[data.correctIndex].click();
-            const container = radioInputs[data.correctIndex].closest('.r0, .r1, .d-flex, div') || radioInputs[data.correctIndex].parentElement;
+          const cIdx = data ? parseInt(data.correctIndex, 10) : NaN;
+
+          if (data && !isNaN(cIdx) && radioInputs[cIdx]) {
+            const radioToClick = radioInputs[cIdx];
+            
+            // Clica no input radio diretamente
+            radioToClick.click();
+            
+            // Também tenta clicar no label associado, pois alguns layouts Moodle escondem o input
+            if (radioToClick.id) {
+              const labelEl = q.querySelector(`label[for="${radioToClick.id}"]`);
+              if (labelEl) labelEl.click();
+            }
+
+            const container = radioToClick.closest('.r0, .r1, .d-flex, div') || radioToClick.parentElement;
             if (container) {
               container.style.background = 'rgba(16, 185, 129, 0.2)';
               container.style.border = '2px solid #10b981';
@@ -185,8 +250,14 @@
             }
             const note = document.createElement('div');
             note.style.cssText = `margin-top: 10px; padding: 12px; border-radius: 10px; background: #064e3b; color: #a7f3d0; font-size: 12px; border: 1px solid #10b981;`;
-            note.innerHTML = `<strong>🎯 Alternativa ${data.correctLetter || ''} marcada!</strong><br/><em>${data.explanation || ''}</em>`;
+            note.innerHTML = `<strong>🎯 Alternativa ${data.correctLetter || String.fromCharCode(65 + cIdx)} marcada!</strong><br/><em>${data.explanation || 'Resolvido pela IA.'}</em>`;
             q.appendChild(note);
+          } else {
+            console.warn('Auto-Pilot: Não foi possível marcar a questão. Data:', data);
+            const errNote = document.createElement('div');
+            errNote.style.cssText = `margin-top: 10px; padding: 12px; border-radius: 10px; background: #7f1d1d; color: #fecaca; font-size: 12px; border: 1px solid #ef4444;`;
+            errNote.innerHTML = `<strong>⚠️ Erro ao resolver:</strong> A IA não retornou um formato válido ou as alternativas são apenas visuais. Responda manualmente.`;
+            q.appendChild(errNote);
           }
         } catch (err) {
           console.error('Erro no Auto-Pilot:', err);
@@ -208,8 +279,82 @@
         nextBtn.style.outline = '4px solid #10b981';
         setTimeout(() => nextBtn.click(), 3000);
       } else {
-        if (statusEl) statusEl.innerHTML = '🎉 <strong>Todas as páginas 100% resolvidas!</strong>';
-        alert('🎉 Prova 100% resolvida pelo EstudaAI!\nConfira as respostas e clique em "Finalizar tentativa..." para enviar suas notas!');
+        // Não achou "Próxima", então procura "Finalizar tentativa..."
+        const finalBtn = allButtons.find(b => {
+          const val = (b.value || b.innerText || '').toLowerCase();
+          return val.includes('finalizar tentativa') || val.includes('finish attempt');
+        });
+
+        if (finalBtn) {
+          if (statusEl) statusEl.innerHTML = '🏁 <strong>Última página! Finalizando tentativa em 3s...</strong>';
+          finalBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          finalBtn.style.outline = '4px solid #10b981';
+          setTimeout(() => finalBtn.click(), 3000);
+        } else {
+          if (statusEl) statusEl.innerHTML = '🎉 <strong>Todas as páginas resolvidas!</strong>';
+          setTimeout(() => chrome.runtime.sendMessage({ action: 'CLOSE_TAB' }), 5000);
+        }
+      }
+    } else if (isQuizPage) {
+      // Estamos na página inicial do quiz ou de revisão/resumo. Procurar botões de fluxo.
+      const allButtons = Array.from(document.querySelectorAll('input[type="submit"], button, form button, a.btn'));
+      
+      const startBtn = allButtons.find(b => {
+        const val = (b.value || b.innerText || '').toLowerCase();
+        return val.includes('tentar responder') || 
+               val.includes('continuar a última') || 
+               val.includes('attempt quiz') || 
+               val.includes('continue the last');
+      });
+
+      if (startBtn) {
+        console.log('🎯 EstudaAI Auto-Pilot: Iniciando/Continuando tentativa do questionário...');
+        showToast('🎯 Iniciando tentativa do questionário...');
+        startBtn.style.outline = '4px solid #10b981';
+        setTimeout(() => startBtn.click(), 1500);
+      } else {
+        // Resumo da tentativa: Procurar botão "Enviar tudo e terminar"
+        const finishBtns = allButtons.filter(b => {
+          const val = (b.value || b.innerText || '').toLowerCase();
+          return val.includes('enviar tudo e terminar') || val.includes('submit all and finish');
+        });
+
+        if (finishBtns.length > 0) {
+          showToast('🚀 Auto-Enviando questionário para nota...');
+          
+          // Neutraliza confirm() nativo caso o Moodle use
+          const script = document.createElement('script');
+          script.textContent = 'window.confirm = function() { return true; };';
+          (document.head||document.documentElement).appendChild(script);
+          script.remove();
+
+          // Clicamos no primeiro (botão da página)
+          finishBtns[0].style.outline = '4px solid #10b981';
+          finishBtns[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => finishBtns[0].click(), 1000);
+
+          // Verifica repetidamente se abriu modal de confirmação (DOM)
+          let checkCount = 0;
+          const interval = setInterval(() => {
+            checkCount++;
+            const confirmBtns = Array.from(document.querySelectorAll('input, button, .btn')).filter(b => {
+              const val = (b.value || b.innerText || '').toLowerCase();
+              return b !== finishBtns[0] && (val.includes('enviar') || val.includes('submit') || val.includes('confirm') || val.includes('sim')) && b.offsetParent !== null;
+            });
+            
+            if (confirmBtns.length > 0) {
+              clearInterval(interval);
+              confirmBtns[confirmBtns.length - 1].click(); // Clica no botão do modal
+              setTimeout(() => chrome.runtime.sendMessage({ action: 'CLOSE_TAB' }), 2000);
+            } else if (checkCount > 10) {
+              clearInterval(interval); // Desiste após 5s
+              setTimeout(() => chrome.runtime.sendMessage({ action: 'CLOSE_TAB' }), 2000);
+            }
+          }, 500);
+        } else {
+          // Se não tem botão de iniciar nem de enviar tudo, provavelmente já acabou
+          setTimeout(() => chrome.runtime.sendMessage({ action: 'CLOSE_TAB' }), 4000);
+        }
       }
     }
   }
@@ -217,16 +362,37 @@
   // ============================================================
   // 2. EXTRAÇÃO E SINCRONIZAÇÃO DE DISCIPLINAS
   // ============================================================
+  const NAV_LABEL_IGNORE = [
+    'PÁGINA INICIAL', 'MEUS CURSOS', 'MINHAS MENSAGENS', 'ANDAMENTO DO CURSO',
+    'MEUS PONTOS', 'CONTATOS DO CURSO', 'MANUAL', 'PLANO DE ENSINO',
+    'SOBRE A ACESSIBILIDADE', 'ALTO-CONTRASTE', 'AUMENTAR FONTE', 'DIMINUIR FONTE',
+    'IR PARA O CONTEÚDO', 'IR PARA O MENU', 'AVA', 'ANHANGUERA', 'UNOPAR'
+  ];
+
   function getStudentInfo() {
     let name = '';
     const userTextEl = document.querySelector('.usertext, .userbutton span.avatars, .login-mat-nome, .user-name, .navbar-nav .nav-item .nav-link span');
     if (userTextEl && userTextEl.textContent.trim()) {
-      name = userTextEl.textContent.trim();
+      name = userTextEl.textContent.trim().split('\n')[0].trim();
     }
     if (!name) {
       // Fallback: busca no avatar ou header
       const avatarEl = document.querySelector('.usermenu .userbutton span, .userinitials');
-      if (avatarEl) name = avatarEl.title || avatarEl.textContent.trim();
+      if (avatarEl) name = (avatarEl.title || avatarEl.textContent.trim()).split('\n')[0].trim();
+    }
+    if (!name) {
+      // Fallback: varre a área de cabeçalho procurando um nome em maiúsculas (2+ palavras)
+      const headerEls = document.querySelectorAll('header *, nav *, [class*="user"] *, [class*="nav"] *');
+      for (const el of headerEls) {
+        if (el.children.length > 0) continue; // só nós-folha
+        const t = el.textContent?.trim().split('\n')[0].trim();
+        if (!t || t.length < 6 || t.length > 60) continue;
+        if (!/^[A-ZÀ-Ú\s]+$/.test(t)) continue;
+        if (t.split(/\s+/).length < 2) continue;
+        if (NAV_LABEL_IGNORE.some(ig => t.includes(ig))) continue;
+        name = t;
+        break;
+      }
     }
 
     return {
@@ -237,72 +403,627 @@
       updatedAt: new Date().toISOString()
     };
   }
+  function fetchCourseDataViaIframe(url) {
+    return new Promise((resolve) => {
+      const iframe = document.createElement('iframe');
+      // Tamanho real para evitar crash do owlCarousel e opacidade 0 para ficar invisível
+      iframe.style.cssText = 'width: 1024px; height: 768px; opacity: 0.01; pointer-events: none; position: fixed; top: -10000px; left: -10000px; border: none; z-index: -9999;';
+      iframe.src = url;
+      
+      const maxTimeout = setTimeout(() => {
+        iframe.remove();
+        resolve(null);
+      }, 15000); // 15s max fallback
 
-  function scrapeDisciplinas() {
-    const ignoreList = ['INSCREVA-SE', 'Processo Seletivo', 'Painel', 'Página', 'Meus Cursos', 'Todos', 'Sair', 'Menu', 'Suporte', 'Avisos', 'Contatos', 'Início', 'Home', 'Boas Vindas', 'Manual'];
-    const cards = document.querySelectorAll(
-      '.dashboard-card, .coursebox, .card-disciplina, a[href*="course/view.php"], a[href*="/disciplina/"], .disciplina-item, .card-curso, .course-info-container'
-    );
-    const nomes = [];
-
-    cards.forEach(c => {
-      const text = c.innerText.trim().split('\n')[0];
-      if (text && text.length > 5 && !nomes.includes(text) && !ignoreList.some(ig => text.toLowerCase().includes(ig.toLowerCase()))) {
-        nomes.push(text);
-      }
+      iframe.onload = () => {
+        let attempts = 0;
+        const interval = setInterval(() => {
+          attempts++;
+          try {
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            const text = doc.body.textContent || '';
+            // Verifica se o AJAX já renderizou a %
+            let andamentoNum = 0;
+            const percentMatch = text.match(/Andamento Geral.*?(\d{1,3})%/is);
+            if (percentMatch) andamentoNum = parseInt(percentMatch[1], 10);
+            
+            // Só resolve quando carregar os itens principais e o Andamento estiver != 0
+            // ou após várias tentativas
+            if ((doc.querySelector('.timeline-item') && andamentoNum > 0) || attempts > 20) {
+              clearInterval(interval);
+              clearTimeout(maxTimeout);
+              resolve({ doc, iframe });
+            }
+          } catch(e) {
+            if (attempts >= 20) {
+              clearInterval(interval);
+              clearTimeout(maxTimeout);
+              resolve(null);
+            }
+          }
+        }, 500); // Checa a cada 500ms
+      };
+      
+      document.body.appendChild(iframe);
     });
+  }
+
+  /**
+   * Carrega a página de um tópico (unidade) num iframe oculto e espera a API de conclusão
+   * (local_completion_api, AWS Lambda) trocar a classe dos ícones de "pendente" para "concluído"
+   * antes de resolver — sem esperar isso, todo ícone lê como pendente (valor padrão do HTML).
+   */
+  function fetchTopicDataViaIframe(url) {
+    return new Promise((resolve) => {
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'width: 1024px; height: 768px; opacity: 0.01; pointer-events: none; position: fixed; top: -10000px; left: -10000px; border: none; z-index: -9999;';
+      iframe.src = url;
+
+      const maxTimeout = setTimeout(() => {
+        iframe.remove();
+        resolve(null);
+      }, 20000);
+
+      iframe.onload = () => {
+        let attempts = 0;
+        const interval = setInterval(() => {
+          attempts++;
+          try {
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            const icons = doc.querySelectorAll('.ct-list-title h3 i[completion_rules]');
+            // Status de conclusão vem direto da API de conclusão (fetchCourseCompletions),
+            // não precisa mais esperar a classe do ícone trocar na tela — só a lista existir.
+            if (icons.length > 0 || attempts > 20) {
+              clearInterval(interval);
+              clearTimeout(maxTimeout);
+              resolve({ doc, iframe });
+            }
+          } catch (e) {
+            if (attempts >= 20) {
+              clearInterval(interval);
+              clearTimeout(maxTimeout);
+              resolve(null);
+            }
+          }
+        }, 500);
+      };
+
+      document.body.appendChild(iframe);
+    });
+  }
+
+  /**
+   * Busca a lista real de módulos concluídos (cmids) direto na API de conclusão da AWS
+   * usada pelo tema Kroton (local_completion_api). Os parâmetros (apiKey, apiUrl, JWT)
+   * vêm embutidos inline no HTML de qualquer página do curso, em:
+   *   M.local_completion_api.init(Y, "<apiKey>", "<apiUrl>", "<jwt>", ...)
+   * O JWT já identifica curso+aluno; a resposta cobre o curso INTEIRO, não só o tópico
+   * da página de onde ele foi extraído — então basta chamar 1x por disciplina.
+   * Retorna um Set<number> de cmids concluídos, ou null se não achou/deu erro.
+   */
+  async function fetchCourseCompletions(doc) {
+    try {
+      const html = doc.documentElement.innerHTML;
+      const m = html.match(/local_completion_api\.init\(\s*Y\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"/);
+      // undefined = não achou o script nessa página (vale tentar de novo em outra página);
+      // null = achou e tentou, mas a requisição falhou (não vale tentar de novo, é sempre a mesma chamada).
+      if (!m) return undefined;
+      // O HTML guarda a string com barras escapadas ("\/"), como texto JSON cru.
+      // O navegador normaliza "\" pra "/" em URLs — sem desescapar, "\/" vira "//" (barra dupla)
+      // e a chamada quebra (rota inexistente pro API Gateway, erro sem header de CORS).
+      const [, apiKeyRaw, apiUrlRaw, jwtRaw] = m;
+      const apiKey = apiKeyRaw.replace(/\\\//g, '/');
+      const apiUrl = apiUrlRaw.replace(/\\\//g, '/');
+      const jwt = jwtRaw.replace(/\\\//g, '/');
+
+      // A AWS bloqueia (CORS/WAF) fetch feito a partir do contexto da extensão, e a página
+      // tem CSP que bloqueia <script> inline. Solução: injeta um <script src> apontando pra
+      // um arquivo real da extensão (permitido pelo CSP via web_accessible_resources) dentro
+      // do documento do iframe, rodando como JS nativo da página; resultado volta via CustomEvent.
+      const completions = await new Promise((resolve) => {
+        const eventName = 'estudaai_completions_' + Math.random().toString(36).slice(2);
+
+        const timeoutId = setTimeout(() => {
+          doc.removeEventListener(eventName, onResult);
+          resolve(null);
+        }, 8000);
+
+        function onResult(e) {
+          clearTimeout(timeoutId);
+          doc.removeEventListener(eventName, onResult);
+          resolve(e.detail);
+        }
+        doc.addEventListener(eventName, onResult);
+
+        const script = doc.createElement('script');
+        script.src = chrome.runtime.getURL('completion-fetch.js');
+        script.dataset.apiUrl = apiUrl;
+        script.dataset.jwt = jwt;
+        script.dataset.apiKey = apiKey;
+        script.dataset.event = eventName;
+        (doc.head || doc.documentElement).appendChild(script);
+      });
+
+      if (!Array.isArray(completions)) return null;
+      return new Set(completions.map(Number));
+    } catch (e) {
+      console.warn('Erro ao buscar completions da API de conclusão:', e);
+      return null;
+    }
+  }
+
+  async function scrapeDisciplinas(onProgress = null) {
+    const cursosEncontrados = [];
+    const ignoreList = ['INSCREVA-SE', 'Processo Seletivo', 'Painel', 'Página', 'Meus Cursos', 'Todos', 'Sair', 'Menu', 'Suporte', 'Avisos', 'Contatos', 'Início', 'Home', 'Boas Vindas', 'Manual'];
+
+    const isCoursePage = window.location.href.includes('course/view.php') || window.location.href.includes('/disciplina/');
+
+    if (!isCoursePage) {
+      // Coleta links reais de cada curso para navegação futura
+      const courseLinks = {};
+      document.querySelectorAll('a[href*="course/view.php"]').forEach(a => {
+        const match = a.href.match(/id=(\d+)/);
+        if (match) {
+          const title = (a.querySelector('.coursename, .multiline, .course-fullname') || a).innerText.trim().split('\n')[0];
+          if (title) courseLinks[title] = { id: match[1], url: a.href };
+        }
+      });
+
+      const cards = document.querySelectorAll(
+        '.dashboard-card, .coursebox, .card-disciplina, a[href*="course/view.php"], a[href*="/disciplina/"], .disciplina-item, .card-curso, .course-info-container'
+      );
+
+      cards.forEach(c => {
+        const text = c.innerText.trim().split('\n')[0];
+        if (text && text.length > 5 && !ignoreList.some(ig => text.toLowerCase().includes(ig.toLowerCase()))) {
+          
+          if (!cursosEncontrados.find(curso => curso.nome === text)) {
+            let andamentoGeral = 0;
+            const percentMatch = c.innerText.match(/(\d+)%/);
+            if (percentMatch) {
+              andamentoGeral = parseInt(percentMatch[1], 10);
+            } else {
+              const progressBar = c.querySelector('[role="progressbar"], .progress-bar, .progress');
+              if (progressBar) {
+                 const val = progressBar.getAttribute('aria-valuenow');
+                 if (val) andamentoGeral = parseInt(val, 10);
+                 else {
+                   const style = progressBar.getAttribute('style') || '';
+                   const widthMatch = style.match(/width:\s*(\d+)%/);
+                   if (widthMatch) andamentoGeral = parseInt(widthMatch[1], 10);
+                 }
+              }
+            }
+
+            cursosEncontrados.push({
+               nome: text,
+               andamentoGeral: andamentoGeral,
+               moodleCourseId: courseLinks[text] ? courseLinks[text].id : null,
+               moodleCourseUrl: courseLinks[text] ? courseLinks[text].url : null,
+            });
+          }
+        }
+      });
+    }
 
     // Fallback: título do curso atual se estiver numa página de curso
-    if (nomes.length === 0) {
-      const courseTitle = document.querySelector('.page-header-headings h1, h1.page-title');
+    if (cursosEncontrados.length === 0 && isCoursePage) {
+      const courseTitle = document.querySelector('.page-header-headings h1, h1.page-title, .course-header h1');
       if (courseTitle) {
         const text = courseTitle.innerText.trim();
         if (text && !ignoreList.some(ig => text.toLowerCase().includes(ig.toLowerCase()))) {
-          nomes.push(text);
+          let andamentoGeral = 0;
+          const bodyPercent = document.body.innerText.match(/(Andamento|Progresso|Conclus[ãa]o|% concluído|Meu Progresso|Seu Progresso).*?(\d{1,3})%/is);
+          if (bodyPercent) {
+             andamentoGeral = parseInt(bodyPercent[2], 10);
+          }
+          
+          let cId = null;
+          try { cId = new URL(window.location.href).searchParams.get('id'); } catch(e){}
+
+          cursosEncontrados.push({
+             nome: text,
+             andamentoGeral: andamentoGeral,
+             moodleCourseId: cId,
+             moodleCourseUrl: window.location.href
+          });
         }
       }
     }
 
-    // Coleta links reais de cada curso para navegação futura
-    const courseLinks = {};
-    document.querySelectorAll('a[href*="course/view.php"]').forEach(a => {
-      const match = a.href.match(/id=(\d+)/);
-      if (match) {
-        const title = (a.querySelector('.coursename, .multiline, .course-fullname') || a).innerText.trim().split('\n')[0];
-        if (title) courseLinks[title] = { id: match[1], url: a.href };
-      }
-    });
+    // --- NOVA LÓGICA DE FETCH ASSÍNCRONO PARA CADA CURSO ---
+    const disciplinasFinais = [];
+    const batchSize = 3;
+    let completedCount = 0;
 
-    return nomes.map((nome, idx) => {
-      const id = `disc-${idx + 1}-${nome.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
-      const courseInfo = courseLinks[nome] || {};
-      return {
-        id,
-        nome,
-        moodleCourseId: courseInfo.id || null,
-        moodleCourseUrl: courseInfo.url || null,
-        codigo: `KLS-${10780 + idx}`,
-        categoria: nome.includes('Extensão') ? 'Extensao' : (idx % 2 === 0 ? 'AMI' : 'DI'),
-        categoriaLabel: nome.includes('Extensão') ? 'Projeto de Extensão' : (idx % 2 === 0 ? 'Aula Modelo Institucional' : 'Disciplinas Interativas (DI)'),
-        andamentoGeral: 0,
-        totalAtividades: 12,
-        atividadesConcluidas: 0,
-        cor: idx % 3 === 0 ? 'text-amber-500' : (idx % 3 === 1 ? 'text-brand-500' : 'text-blue-500'),
-        corFundo: idx % 3 === 0 ? 'bg-amber-500/10 border-amber-500/30' : (idx % 3 === 1 ? 'bg-brand-500/10 border-brand-500/30' : 'bg-blue-500/10 border-blue-500/30'),
-        icone: nome.includes('Direito') ? 'Scale' : 'BookOpen',
-        unidades: [1, 2, 3, 4].map(n => ({
-          numero: n,
-          titulo: `Unidade ${n}`,
-          andamentoTopico: 0,
-          atividades: [
-            { id: `${id}-u${n}-at1`, tipo: 'livro_didatico', titulo: `U${n} - Livro Didático (PDF)`, status: 'pendente' },
-            { id: `${id}-u${n}-at2`, tipo: 'webaula', titulo: `U${n} - Webaula e Teleaula`, status: 'pendente' },
-            { id: `${id}-u${n}-at3`, tipo: 'aprendizagem', titulo: `U${n} - Atividade de Aprendizagem (AAP)`, status: 'pendente' },
-            { id: `${id}-u${n}-at4`, tipo: 'avaliacao_unidade', titulo: `U${n} - Avaliação da Unidade (AV)`, status: 'pendente' }
-          ]
-        }))
-      };
+    for (let i = 0; i < cursosEncontrados.length; i += batchSize) {
+      const batch = cursosEncontrados.slice(i, i + batchSize);
+      
+      const batchPromises = batch.map(async (curso, bIdx) => {
+        const idx = i + bIdx;
+        let andamentoReal = curso.andamentoGeral;
+        let unidadesReais = [];
+        let totalAtividades = 12; // fallback
+        let doc = document;
+        let iframe = null;
+        // Cmids concluídos de verdade (segundo a API AWS de conclusão), preenchido abaixo.
+        // Cobre a disciplina inteira, então é buscado 1x só e reaproveitado por todo módulo.
+        // `courseCompletionsTried` evita tentar de novo em cada módulo se a 1ª tentativa
+        // falhar (senão vira uma avalanche de requisições repetidas pro mesmo endpoint).
+        let courseCompletions = null;
+        let courseCompletionsTried = false;
+
+        // Se não encontramos % na tela inicial e temos o URL, vamos buscar lá dentro
+        if (curso.moodleCourseUrl) {
+          try {
+            // Só faz fetch se não for a própria página atual (evitar requisição redundante)
+            if (curso.moodleCourseUrl !== window.location.href) {
+              const res = await fetchCourseDataViaIframe(curso.moodleCourseUrl);
+              if (res) {
+                 doc = res.doc;
+                 iframe = res.iframe;
+              }
+            }
+
+            if (doc) {
+              const result = await fetchCourseCompletions(doc);
+              courseCompletions = result || null;
+              courseCompletionsTried = result !== undefined;
+
+              // 1. Tentar extrair % exato ("Andamento Geral") apenas se for maior (evitar que o HTML cru com 0% sobrescreva o valor do dashboard)
+              const textContent = doc.body.textContent || '';
+              const percentMatchPage = textContent.match(/Andamento Geral.*?(\d{1,3})%/is);
+              let extractedPercent = 0;
+              if (percentMatchPage) {
+                 extractedPercent = parseInt(percentMatchPage[1], 10);
+              } else {
+                 const progressEl = doc.querySelector('.progress-bar, [role="progressbar"]');
+                 if (progressEl) {
+                   const val = progressEl.getAttribute('aria-valuenow');
+                   if (val) extractedPercent = parseInt(val, 10);
+                   else {
+                     const style = progressEl.getAttribute('style') || '';
+                     const widthMatch = style.match(/width:\s*(\d+)%/);
+                     if (widthMatch) extractedPercent = parseInt(widthMatch[1], 10);
+                   }
+                 }
+              }
+              if (extractedPercent > andamentoReal) {
+                  andamentoReal = extractedPercent;
+              }
+
+              // 2. Extrair módulos reais do CTMenu (estrutura real da Anhanguera/Kroton)
+              const ctmenuGroups = doc.querySelectorAll('#ctmenu .timeline-item.group[data-ct-groupname]');
+              if (ctmenuGroups.length > 0) {
+                let numUnidade = 1;
+                
+                // Coletar todos os sub-itens de todos os grupos com seus URLs
+                const allSubItems = [];
+                ctmenuGroups.forEach(group => {
+                  const groupName = group.getAttribute('data-ct-groupname');
+                  if (!groupName) return;
+                  
+                  const parentLi = group.closest('li');
+                  if (!parentLi) return;
+                  
+                  const subMenu = parentLi.querySelector('.timeline-menu ul');
+                  if (!subMenu) return;
+                  
+                  const subLinks = subMenu.querySelectorAll('li a[href]');
+                  const modules = [];
+                  subLinks.forEach(a => {
+                    const name = a.textContent.trim();
+                    const href = a.href || a.getAttribute('href');
+                    if (name && href) modules.push({ name, href });
+                  });
+                  
+                  if (modules.length > 0) {
+                    allSubItems.push({ groupName, modules, numUnidade: numUnidade++ });
+                  }
+                });
+                
+                // Fetch dos sub-itens com concorrência limitada (evita abrir dezenas de
+                // iframes ocultos ao mesmo tempo — uma matéria com 8 unidades x 3 módulos
+                // chegaria a 24 simultâneos, sobrecarregando o navegador e falhando fetches).
+                unidadesReais = await mapWithConcurrency(allSubItems, 3, async (unitInfo) => {
+                  const moduleAtividades = [];
+
+                  // Fetch de cada módulo da unidade em paralelo (no máx. 3 unidades em paralelo,
+                  // então no máx. 9 iframes simultâneos)
+                  const modulePromises = unitInfo.modules.map(async (mod) => {
+                    const atividades = [];
+                    let res = null;
+                    try {
+                      // Usar iframe para tópicos para garantir que os ícones do AWS completion API sejam renderizados pelo JS!
+                      res = await fetchTopicDataViaIframe(mod.href);
+                      if (!res || !res.doc) throw new Error("Iframe falhou");
+                      
+                      const topicDoc = res.doc;
+
+                      // Fallback: se a página de visão geral do curso não tinha o script da
+                      // API de conclusão embutido, tenta pegar da primeira página de tópico —
+                      // mas só 1 vez pra disciplina toda, nunca de novo se já tentou/falhou.
+                      if (!courseCompletions && !courseCompletionsTried) {
+                        const result = await fetchCourseCompletions(topicDoc);
+                        courseCompletions = result || null;
+                        courseCompletionsTried = result !== undefined;
+                      }
+
+                      // Extrair as atividades reais: div.ct-list > .ct-list-title > h3 > a
+                      const ctLists = topicDoc.querySelectorAll('.ct-resource-list .ct-list, .ct-list');
+                      ctLists.forEach(ct => {
+                        const titleEl = ct.querySelector('.ct-list-title h3 a');
+                        const title = titleEl ? titleEl.textContent.trim() : '';
+                        if (!title) return;
+                        
+                        // Extrair ícone para mapeamento de tipo e conclusão
+                        const iconEl = ct.querySelector('.ct-list-title h3 i[completion], i.material-icons, i[class*="icon-"]');
+                        const classList = iconEl ? iconEl.className.toLowerCase() : '';
+
+                        let tipo = 'webaula';
+                        if (classList.includes('icon-book') || classList.includes('icon-file') || classList.includes('icon-description')) {
+                          tipo = 'livro_didatico';
+                        } else if (classList.includes('icon-ondemand_video') || classList.includes('icon-play') || classList.includes('icon-movie')) {
+                          tipo = 'webaula';
+                        } else if (classList.includes('icon-assignment') || classList.includes('icon-quiz') || classList.includes('icon-spellcheck')) {
+                          tipo = 'aprendizagem';
+                        }
+
+                        // Fallback title matching if icon doesn't give a clear type or to refine it
+                        const tLower = title.toLowerCase();
+                        if (tLower.includes('avaliativ') || tLower.includes('avaliação') || tLower.includes('prova')) tipo = 'avaliacao_unidade';
+                        else if (tLower.includes('questõ') || tLower.includes('fixaç') || tLower.includes('aprendizagem') || tLower.includes('aap')) tipo = 'aprendizagem';
+                        else if (tipo === 'webaula' && (tLower.includes('livro') || tLower.includes('pdf') || tLower.includes('material') || tLower.includes('leitura'))) tipo = 'livro_didatico';
+                        else if (tLower.includes('certificado')) tipo = 'certificado';
+
+                        // Status de conclusão: fonte da verdade é a API AWS de conclusão
+                        // (fetchCourseCompletions) — o id do ícone É o cmid do módulo no Moodle.
+                        // A classe CSS do ícone só reflete isso depois de um JS assíncrono rodar
+                        // na tela, então não dá pra confiar nela (é sempre "pendente" no HTML cru).
+                        let isDone = false;
+                        const cmid = iconEl ? parseInt(iconEl.getAttribute('id'), 10) : NaN;
+                        const titleAttr = iconEl ? (iconEl.getAttribute('title') || '').toLowerCase() : '';
+
+                        if (courseCompletions && !isNaN(cmid)) {
+                          isDone = courseCompletions.has(cmid);
+                        } else {
+                          // Sem a API (falhou/bloqueada): heurística genérica de fallback pela classe
+                          const completionDoneClass = iconEl ? (iconEl.getAttribute('completion_rules') || '').toLowerCase() : '';
+                          if (completionDoneClass && classList.includes(completionDoneClass)) isDone = true;
+                          else if (classList.includes('check') || classList.includes('done') || classList.includes('success') || classList.includes('conclu')) isDone = true;
+                        }
+                        if (titleAttr.includes('conclu') || titleAttr.includes('feito')) isDone = true;
+
+                        // Look for any explicit completion marks inside the ct-list
+                        const extraCompletionMark = ct.querySelector('.text-success, .badge-success, img[alt*="Conclu"], i.fa-check');
+                        if (extraCompletionMark) isDone = true;
+                        
+                        atividades.push({
+                          tipo,
+                          titulo: title,
+                          status: isDone ? 'concluida' : 'pendente',
+                          url: titleEl ? (titleEl.href || titleEl.getAttribute('href')) : mod.href
+                        });
+                      });
+                    } catch (e) {
+                      console.warn('Erro ao fetch topic:', mod.href, e);
+                    } finally {
+                      if (res && res.iframe) res.iframe.remove();
+                    }
+                    return { moduleName: mod.name, atividades };
+                  });
+                  
+                  const moduleResults = await Promise.all(modulePromises);
+                  
+                  // Juntar todas as atividades de todos os módulos em uma única lista
+                  const todasAtividades = [];
+                  moduleResults.forEach(mr => {
+                    mr.atividades.forEach((at, i) => {
+                      todasAtividades.push({
+                        ...at,
+                        id: `disc-${idx + 1}-u${unitInfo.numUnidade}-at${todasAtividades.length + 1}`
+                      });
+                    });
+                  });
+                  
+                  // Se fetch falhou pra tudo, usar os nomes dos módulos do menu como fallback
+                  const usedFallback = todasAtividades.length === 0;
+                  if (usedFallback) {
+                    unitInfo.modules.forEach((mod, i) => {
+                      let tipo = 'webaula';
+                      const tLower = mod.name.toLowerCase();
+                      if (tLower.includes('avaliativ') || tLower.includes('avaliação')) tipo = 'avaliacao_unidade';
+                      else if (tLower.includes('questõ') || tLower.includes('fixaç')) tipo = 'aprendizagem';
+
+                      todasAtividades.push({
+                        id: `disc-${idx + 1}-u${unitInfo.numUnidade}-at${i + 1}`,
+                        tipo,
+                        titulo: mod.name,
+                        status: 'pendente',
+                        url: mod.href
+                      });
+                    });
+                  }
+
+                  // Só usa a estimativa linear (Andamento Geral / total de unidades) quando NÃO
+                  // conseguimos o dado real de cada item — nunca sobrescrever status real já lido.
+                  const percentPerUnit = 100 / ctmenuGroups.length;
+                  const isUCompleted = usedFallback && andamentoReal >= (unitInfo.numUnidade * percentPerUnit);
+
+                  if (isUCompleted) {
+                    todasAtividades.forEach(a => a.status = 'concluida');
+                  }
+                  
+                  const doneCount = todasAtividades.filter(a => a.status === 'concluida').length;
+                  const topicPercent = isUCompleted ? 100 : (todasAtividades.length > 0 ? Math.round((doneCount / todasAtividades.length) * 100) : 0);
+                  
+                  return {
+                    numero: unitInfo.numUnidade,
+                    titulo: unitInfo.groupName,
+                    andamentoTopico: topicPercent,
+                    atividades: todasAtividades
+                  };
+                });
+              }
+              
+              // 2b. Extrair atividades da área de conteúdo principal (div.ct-list)
+              if (unidadesReais.length === 0) {
+                const ctLists = doc.querySelectorAll('.ct-resource-list .ct-list');
+                if (ctLists.length > 0) {
+                  const atividadesPrincipais = [];
+                  ctLists.forEach((ct, aIdx) => {
+                    const titleEl = ct.querySelector('.ct-list-title h3 a');
+                    const title = titleEl ? titleEl.textContent.trim() : '';
+                    if (!title) return;
+                    
+                    const iconEl = ct.querySelector('.ct-list-title h3 i[completion]');
+                    const completionVal = iconEl ? iconEl.getAttribute('completion') : '';
+                    const isDone = completionVal.includes('check') || completionVal.includes('done');
+                    
+                    let tipo = 'webaula';
+                    const tLower = title.toLowerCase();
+                    if (tLower.includes('avaliativ') || tLower.includes('avaliação') || tLower.includes('prova')) tipo = 'avaliacao_unidade';
+                    else if (tLower.includes('questõ') || tLower.includes('fixaç') || tLower.includes('aprendizagem') || tLower.includes('aap')) tipo = 'aprendizagem';
+                    else if (tLower.includes('livro') || tLower.includes('pdf') || tLower.includes('material') || tLower.includes('leitura')) tipo = 'livro_didatico';
+                    
+                    atividadesPrincipais.push({
+                      id: `disc-${idx + 1}-u1-at${aIdx + 1}`,
+                      tipo: tipo,
+                      titulo: title,
+                      status: isDone ? 'concluida' : 'pendente'
+                    });
+                  });
+                  
+                  if (atividadesPrincipais.length > 0) {
+                    const doneCount = atividadesPrincipais.filter(a => a.status === 'concluida').length;
+                    unidadesReais.push({
+                      numero: 1,
+                      titulo: 'Conteúdo Principal',
+                      andamentoTopico: Math.round((doneCount / atividadesPrincipais.length) * 100),
+                      atividades: atividadesPrincipais
+                    });
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('Erro ao fazer fetch do curso via iframe:', curso.moodleCourseUrl, e);
+          }
+        }
+
+        const nome = curso.nome;
+        const id = `disc-${idx + 1}-${nome.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+        
+        // Fallback final: se nenhuma unidade foi encontrada, usar genéricos
+        if (unidadesReais.length === 0) {
+          unidadesReais = [1, 2, 3, 4].map(n => {
+            const isUCompleted = andamentoReal >= (n * 25);
+            return {
+              numero: n,
+              titulo: `Unidade ${n}`,
+              andamentoTopico: isUCompleted ? 100 : (andamentoReal > ((n-1)*25) ? (andamentoReal - ((n-1)*25)) * 4 : 0),
+              atividades: [
+                { id: `${id}-u${n}-at1`, tipo: 'livro_didatico', titulo: `Livro Didático (PDF)`, status: isUCompleted ? 'concluida' : 'pendente' },
+                { id: `${id}-u${n}-at2`, tipo: 'webaula', titulo: `Webaula e Teleaula`, status: isUCompleted ? 'concluida' : 'pendente' },
+                { id: `${id}-u${n}-at3`, tipo: 'aprendizagem', titulo: `Atividade de Aprendizagem (AAP)`, status: isUCompleted ? 'concluida' : 'pendente' },
+                { id: `${id}-u${n}-at4`, tipo: 'avaliacao_unidade', titulo: `Avaliação da Unidade (AV)`, status: isUCompleted ? 'concluida' : 'pendente' }
+              ]
+            }
+          });
+        }
+        
+        totalAtividades = unidadesReais.reduce((sum, u) => sum + (u.atividades ? u.atividades.length : 0), 0);
+        let atividadesConcluidas = 0;
+        if (unidadesReais.some(u => u.atividades && u.atividades.length > 0)) {
+           unidadesReais.forEach(u => {
+             atividadesConcluidas += u.atividades.filter(a => a.status === 'concluida').length;
+           });
+           if (andamentoReal === 0 && totalAtividades > 0) {
+             andamentoReal = Math.round((atividadesConcluidas / totalAtividades) * 100);
+           }
+        } else {
+           atividadesConcluidas = Math.round((andamentoReal / 100) * totalAtividades);
+        }
+
+        if (iframe) {
+           setTimeout(() => iframe.remove(), 500);
+        }
+
+        return {
+          id,
+          nome,
+          moodleCourseId: curso.moodleCourseId,
+          moodleCourseUrl: curso.moodleCourseUrl,
+          codigo: `KLS-${10780 + idx}`,
+          categoria: nome.includes('Extensão') ? 'Extensao' : (idx % 2 === 0 ? 'AMI' : 'DI'),
+          categoriaLabel: nome.includes('Extensão') ? 'Projeto de Extensão' : (idx % 2 === 0 ? 'Aula Modelo Institucional' : 'Disciplinas Interativas (DI)'),
+          andamentoGeral: andamentoReal,
+          totalAtividades: totalAtividades,
+          atividadesConcluidas: atividadesConcluidas,
+          cor: idx % 3 === 0 ? 'text-amber-500' : (idx % 3 === 1 ? 'text-brand-500' : 'text-blue-500'),
+          corFundo: idx % 3 === 0 ? 'bg-amber-500/10 border-amber-500/30' : (idx % 3 === 1 ? 'bg-brand-500/10 border-brand-500/30' : 'bg-blue-500/10 border-blue-500/30'),
+          icone: nome.includes('Direito') ? 'Scale' : 'BookOpen',
+          unidades: unidadesReais
+        };
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+      batchResults.forEach(res => {
+        disciplinasFinais.push(res);
+        completedCount++;
+        if (onProgress) onProgress(completedCount, cursosEncontrados.length, res.nome);
+      });
+    }
+
+    return disciplinasFinais;
+  }
+
+  function showSyncModal() {
+    const modalHtml = `
+      <div id="estudaai-sync-modal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(8px); z-index: 999999; display: flex; align-items: center; justify-content: center; font-family: sans-serif;">
+        <div style="background: #1E293B; border: 1px solid #334155; border-radius: 12px; padding: 32px; width: 450px; text-align: center; color: white; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
+           <h2 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 600;">Sincronizando o AVA</h2>
+           <p style="margin: 0 0 24px 0; color: #94A3B8; font-size: 14px; line-height: 1.5;">Relaxe e não feche esta aba. Estamos lendo as matérias diretamente do banco de dados (isso leva cerca de 1 a 2 minutos).</p>
+           
+           <div style="background: #0F172A; border-radius: 999px; height: 8px; width: 100%; overflow: hidden; margin-bottom: 12px;">
+             <div id="estudaai-sync-progress-bar" style="background: #10B981; height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+           </div>
+           
+           <div style="display: flex; justify-content: space-between; font-size: 13px;">
+              <span id="estudaai-sync-status-text" style="color: #cbd5e1;">Preparando...</span>
+              <span id="estudaai-sync-count-text" style="color: #10B981; font-weight: 600;">0%</span>
+           </div>
+           
+           <div id="estudaai-sync-success-box" style="display: none; margin-top: 24px;">
+              <a href="https://estudaai.pages.dev/disciplinas" target="_blank" style="display: inline-block; background: #10B981; color: white; padding: 10px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; cursor: pointer;">👉 Abrir no EstudaAI</a>
+              <button id="estudaai-sync-close-btn" style="display: block; margin: 12px auto 0 auto; background: none; border: none; color: #94A3B8; cursor: pointer; font-size: 12px; text-decoration: underline;">Fechar</button>
+           </div>
+        </div>
+      </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    document.getElementById('estudaai-sync-close-btn')?.addEventListener('click', () => {
+      document.getElementById('estudaai-sync-modal').remove();
     });
+  }
+
+  function updateSyncModal(current, total, nome) {
+    const percent = Math.round((current / total) * 100);
+    const bar = document.getElementById('estudaai-sync-progress-bar');
+    const statusText = document.getElementById('estudaai-sync-status-text');
+    const countText = document.getElementById('estudaai-sync-count-text');
+    
+    if (bar) bar.style.width = `${percent}%`;
+    if (statusText) statusText.innerText = `Analisando: ${nome} (${current}/${total})`;
+    if (countText) countText.innerText = `${percent}%`;
+  }
+
+  function completeSyncModal() {
+    const statusText = document.getElementById('estudaai-sync-status-text');
+    const successBox = document.getElementById('estudaai-sync-success-box');
+    if (statusText) statusText.innerText = '✅ Sincronizado com Sucesso!';
+    if (successBox) successBox.style.display = 'block';
   }
 
   // ============================================================
@@ -312,42 +1033,48 @@
     if (window.location.href.includes('/mod/quiz/attempt')) return;
     if (document.getElementById('estudaai-floating-widget')) return;
 
-    const student = getStudentInfo();
-    const widget = document.createElement('div');
-    widget.id = 'estudaai-floating-widget';
-    widget.innerHTML = `
-      <div class="estudaai-widget-card">
-        <div class="estudaai-widget-header">
-          <span class="estudaai-badge">🎓 EstudaAI Conector</span>
-          <button id="estudaai-close-widget" title="Fechar">✕</button>
+    chrome.storage.local.get(['estudaai_is_logged_in'], (res) => {
+      const isLoggedIn = !!res.estudaai_is_logged_in;
+      const student = getStudentInfo();
+      const widget = document.createElement('div');
+      widget.id = 'estudaai-floating-widget';
+      
+      const btnColor = isLoggedIn ? '#10b981' : '#3b82f6';
+      const btnText = isLoggedIn ? '⚡ Sincronizar com EstudaAI' : 'Fazer Login no EstudaAI';
+
+      widget.innerHTML = `
+        <div class="estudaai-widget-card">
+          <div class="estudaai-widget-header">
+            <span class="estudaai-badge">🎓 EstudaAI Conector</span>
+            <button id="estudaai-close-widget" title="Fechar">✕</button>
+          </div>
+          <div class="estudaai-student-name">${student.name}</div>
+          <div class="estudaai-info-text">Sincronize suas disciplinas e atividades com a plataforma EstudaAI em 1 clique.</div>
+          <button id="estudaai-btn-sync-widget" class="estudaai-btn-sync" style="background-color: ${btnColor} !important; border-color: ${btnColor} !important;">${btnText}</button>
+          <div id="estudaai-widget-status" class="estudaai-status-msg" style="display:none;"></div>
         </div>
-        <div class="estudaai-student-name">${student.name}</div>
-        <div class="estudaai-info-text">Sincronize suas disciplinas e atividades com a plataforma EstudaAI em 1 clique.</div>
-        <button id="estudaai-btn-sync-widget" class="estudaai-btn-sync">⚡ Sincronizar com EstudaAI</button>
-        <div id="estudaai-widget-status" class="estudaai-status-msg" style="display:none;"></div>
-      </div>
-    `;
-    document.body.appendChild(widget);
+      `;
+      document.body.appendChild(widget);
 
-    document.getElementById('estudaai-close-widget')?.addEventListener('click', () => widget.remove());
+      document.getElementById('estudaai-close-widget')?.addEventListener('click', () => widget.remove());
 
-    const syncBtn = document.getElementById('estudaai-btn-sync-widget');
-    const statusBox = document.getElementById('estudaai-widget-status');
+      const syncBtn = document.getElementById('estudaai-btn-sync-widget');
+      const statusBox = document.getElementById('estudaai-widget-status');
 
-    syncBtn?.addEventListener('click', () => {
-      syncBtn.disabled = true;
-      syncBtn.innerText = '🔄 Sincronizando...';
-
-      chrome.storage.local.get(['estudaai_is_logged_in'], (res) => {
-        if (!res.estudaai_is_logged_in) {
-          alert('⚠️ Você não está logado no EstudaAI!\n\nPor favor, faça login ou cadastre-se na plataforma EstudaAI (estudaai.pages.dev) para validar sua licença antes de sincronizar.');
-          syncBtn.disabled = false;
-          syncBtn.innerText = '⚡ Sincronizar com EstudaAI';
+      syncBtn?.addEventListener('click', async () => {
+        if (!isLoggedIn) {
+          window.open('https://estudaai.pages.dev/login', '_blank');
           return;
         }
 
+        syncBtn.disabled = true;
+        syncBtn.innerText = '🔄 Sincronizando...';
+        showSyncModal();
+
         const studentData = getStudentInfo();
-        const discData = scrapeDisciplinas();
+        const discData = await scrapeDisciplinas((curr, total, nome) => {
+           updateSyncModal(curr, total, nome);
+        });
 
         chrome.runtime.sendMessage({
           action: 'SAVE_DISCIPLINAS',
@@ -355,9 +1082,10 @@
         }, () => {
           syncBtn.disabled = false;
           syncBtn.innerText = '✅ Sincronizado!';
+          completeSyncModal();
           if (statusBox) {
             statusBox.style.display = 'block';
-            statusBox.innerHTML = `🎉 <strong>${discData.length} matérias</strong> sincronizadas!<br/><a href="https://estudaai.pages.dev/disciplinas" target="_blank">👉 Abrir no EstudaAI</a>`;
+            statusBox.innerHTML = `🎉 <strong>${discData.length} matérias</strong> sincronizadas com sucesso!<br/><a href="https://estudaai.pages.dev/disciplinas" target="_blank">👉 Abrir no EstudaAI</a>`;
           }
         });
       });
@@ -423,6 +1151,16 @@
       }
     });
 
+    // 4.1 Clicar em botão de certificado
+    document.querySelectorAll('a, button, input[type="button"], input[type="submit"]').forEach(btn => {
+      const text = (btn.value || btn.innerText || '').toLowerCase();
+      if (text.includes('obtenha seu certificado') || text.includes('imprimir certificado') || text.includes('gerar certificado')) {
+        btn.click();
+        showToast('📜 Certificado gerado/impresso com sucesso!');
+        concluiu = true;
+      }
+    });
+
     // 5. Scroll completo em páginas de leitura
     if (window.location.href.match(/\/mod\/(resource|page|book|folder)\//)) {
       window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
@@ -437,7 +1175,7 @@
     }
   }
 
-  async function autoPilotDisciplina(disciplinaNome) {
+  async function autoPilotDisciplina(disciplinaNome, visitedCmidsGlobais = []) {
     showToast(`🚀 Iniciando Auto-Pilot para "${disciplinaNome || 'esta disciplina'}". Abrindo tópicos...`);
     
     // Tenta expandir todos os tópicos/acordeões antes de ler (Kroton/Moodle carregam via AJAX às vezes)
@@ -462,24 +1200,31 @@
       atividades.push(...coletarAtividadesDoCurso());
     }
 
-    showToast(`🔍 ${atividades.length} atividades encontradas para processamento.`);
+    // Filtra atividades que já foram abertas nesta sessão (evita abrir 30 abas iguais ao trocar de tópico)
+    const atividadesFiltradas = atividades.filter(a => !visitedCmidsGlobais.includes(a.cmid));
+
+    showToast(`🔍 ${atividadesFiltradas.length} atividades novas encontradas nesta página.`);
     
     let concluidas = 0;
+    const novosCmidsVisitados = [];
     
-    for (const atividade of atividades) {
+    for (const atividade of atividadesFiltradas) {
+      novosCmidsVisitados.push(atividade.cmid);
       try {
         // Moodle completion via API (mais rápido, não precisa abrir cada página)
         const ok = await moodleMarkComplete(atividade.cmid);
         if (ok) concluidas++;
 
-        // Se for quiz, abre e resolve
-        if (atividade.tipo === 'quiz' && atividade.href) {
-          // Sinaliza ao background para abrir e resolver o quiz
+        // Abre a atividade em nova aba e resolve (seja quiz ou apenas visualização)
+        if (atividade.href) {
+          const taskName = atividade.tipo === 'quiz' ? 'solve_quiz' : 'complete_activity';
           chrome.runtime.sendMessage({
             action: 'AUTOPILOT_OPEN_AND_EXECUTE',
-            payload: { url: atividade.href, task: 'solve_quiz' }
+            payload: { url: atividade.href, task: taskName }
           });
-          await new Promise(r => setTimeout(r, 800));
+          
+          // Espera 1.5s entre a abertura de cada aba para não sobrecarregar
+          await new Promise(r => setTimeout(r, 1500));
         }
       } catch (e) {
         console.warn(`Erro ao concluir ${atividade.titulo}:`, e);
@@ -488,9 +1233,17 @@
       await new Promise(r => setTimeout(r, 300));
     }
 
-    showToast(`✅ Auto-Pilot concluído! ${concluidas}/${atividades.length} atividades marcadas no AVA.`);
+    showToast(`✅ Auto-Pilot concluído nesta aba! ${concluidas}/${atividadesFiltradas.length} atividades processadas.`);
 
-    return { concluidas, total: atividades.length };
+    // Encontrar todos os links de tópicos (paginação de unidades)
+    const topicUrls = [];
+    document.querySelectorAll('a[href*="course/view.php"]').forEach(a => {
+      if (a.href.includes('&topic=')) {
+        topicUrls.push(a.href);
+      }
+    });
+
+    return { concluidas, total: atividadesFiltradas.length, topicUrls, visitedCmids: novosCmidsVisitados };
   }
 
   // ============================================================
@@ -526,9 +1279,10 @@
     // Popup: coletar dados do AVA
     if (request.action === 'SCRAPE_DATA') {
       const student = getStudentInfo();
-      const disciplinas = scrapeDisciplinas();
-      sendResponse({ success: true, student, disciplinas });
-      return true;
+      scrapeDisciplinas().then(disciplinas => {
+        sendResponse({ success: true, student, disciplinas });
+      });
+      return true; // Keep message channel open for async response
     }
 
     // Popup: concluir atividade da página atual
@@ -542,7 +1296,7 @@
       const { task, disciplinaId, disciplinaNome } = request;
 
       if (task === 'complete_all' || task === 'complete_discipline') {
-        autoPilotDisciplina(disciplinaNome).then(result => sendResponse({ success: true, ...result }));
+        autoPilotDisciplina(disciplinaNome, request.visitedCmids || []).then(result => sendResponse({ success: true, ...result }));
         return true;
       }
 
@@ -551,8 +1305,12 @@
         return true;
       }
 
-      if (task === 'complete_activity') {
-        autoCompleteNonQuizActivities().then(() => sendResponse({ success: true }));
+      if (task === 'complete_activity' || task === 'complete_single') {
+        autoCompleteNonQuizActivities().then(() => {
+          sendResponse({ success: true });
+          // Fecha a aba depois de um tempinho pra não acumular
+          setTimeout(() => chrome.runtime.sendMessage({ action: 'CLOSE_TAB' }), 2500);
+        });
         return true;
       }
     }

@@ -8,6 +8,12 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // FECHAR ABA
+  if (request.action === 'CLOSE_TAB' && sender.tab) {
+    chrome.tabs.remove(sender.tab.id).catch(() => {});
+    sendResponse({ success: true });
+    return true;
+  }
 
   // ============================================================
   // SALVAR DISCIPLINAS SINCRONIZADAS DO AVA
@@ -79,6 +85,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return true; // Keep message channel open
     }
 
+    // Lógica 100% Autônoma: Atividade única (ex: certificado)
+    if (task === 'complete_single' && url) {
+      executeSingleAutonomous(url, sendResponse);
+      return true;
+    }
+
     // Fallback original: Procura aba do AVA aberta
     chrome.tabs.query({
       url: [
@@ -146,44 +158,85 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// Helper: Executa uma disciplina em aba temporária e depois fecha
-function executeDisciplineAutonomous(url, disciplinaNome, sendResponse) {
-  chrome.tabs.create({ url: url, active: false }, (tab) => {
-    const listener = (tabId, changeInfo) => {
-      if (tabId === tab.id && changeInfo.status === 'complete') {
-        chrome.tabs.onUpdated.removeListener(listener);
-        
-        // Dá um pequeno tempo para a página terminar renderização JS pesada
-        setTimeout(() => {
-          chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            files: ['content.js']
-          }, () => {
-            if (chrome.runtime.lastError) {
-              console.error('Script injection failed:', chrome.runtime.lastError.message);
-              chrome.tabs.remove(tab.id);
-              sendResponse({ success: false, error: chrome.runtime.lastError.message, concluidas: 0, total: 0 });
-              return;
-            }
-            
-            // Envia o comando
-            chrome.tabs.sendMessage(tab.id, {
-              action: 'AUTOPILOT_EXECUTE',
-              task: 'complete_discipline',
-              disciplinaNome: disciplinaNome
-            }, (response) => {
+// Helper: Executa uma disciplina em aba temporária e navega por todos os tópicos (paginações)
+function executeDisciplineAutonomous(initialUrl, disciplinaNome, sendResponse) {
+  let totalConcluidas = 0;
+  let totalEncontradas = 0;
+  const visitedTopics = new Set();
+  const pendingTopics = [];
+  const visitedCmids = new Set(); // Adicionado para rastrear cmids únicos!
+
+  // Remove hash properties to normalize URL
+  const cleanInitial = initialUrl.split('#')[0];
+  visitedTopics.add(cleanInitial);
+
+  chrome.tabs.create({ url: initialUrl, active: false }, (tab) => {
+    
+    function injectAndProcess(currentUrl) {
+      const listener = (tabId, changeInfo) => {
+        if (tabId === tab.id && changeInfo.status === 'complete') {
+          chrome.tabs.onUpdated.removeListener(listener);
+          
+          setTimeout(() => {
+            chrome.scripting.executeScript({
+              target: { tabId: tab.id },
+              files: ['content.js']
+            }, () => {
               if (chrome.runtime.lastError) {
-                console.error('Message failed:', chrome.runtime.lastError.message);
+                console.error('Script injection failed:', chrome.runtime.lastError.message);
+                goToNextTopic();
+                return;
               }
-              // Resposta recebida, fecha a aba e responde pro EstudaAI
-              chrome.tabs.remove(tab.id);
-              sendResponse(response || { success: true, concluidas: 0, total: 0 });
+              
+              chrome.tabs.sendMessage(tab.id, {
+                action: 'AUTOPILOT_EXECUTE',
+                task: 'complete_discipline',
+                disciplinaNome: disciplinaNome,
+                visitedCmids: Array.from(visitedCmids)
+              }, (response) => {
+                if (response) {
+                  totalConcluidas += (response.concluidas || 0);
+                  totalEncontradas += (response.total || 0);
+                  
+                  if (response.visitedCmids) {
+                    response.visitedCmids.forEach(cmid => visitedCmids.add(cmid));
+                  }
+                  
+                  if (response.topicUrls && Array.isArray(response.topicUrls)) {
+                    response.topicUrls.forEach(tUrl => {
+                      const cleanUrl = tUrl.split('#')[0];
+                      if (!visitedTopics.has(cleanUrl) && !pendingTopics.includes(cleanUrl)) {
+                        pendingTopics.push(cleanUrl);
+                      }
+                    });
+                  }
+                }
+                goToNextTopic();
+              });
             });
-          });
-        }, 2000);
+          }, 1500);
+        }
+      };
+      
+      chrome.tabs.onUpdated.addListener(listener);
+      
+      if (currentUrl !== initialUrl) {
+        chrome.tabs.update(tab.id, { url: currentUrl });
       }
-    };
-    chrome.tabs.onUpdated.addListener(listener);
+    }
+
+    function goToNextTopic() {
+      if (pendingTopics.length === 0) {
+        chrome.tabs.remove(tab.id);
+        sendResponse({ success: true, concluidas: totalConcluidas, total: totalEncontradas });
+      } else {
+        const nextUrl = pendingTopics.shift();
+        visitedTopics.add(nextUrl);
+        injectAndProcess(nextUrl);
+      }
+    }
+
+    injectAndProcess(initialUrl);
   });
 }
 
@@ -210,4 +263,39 @@ async function executeAllAutonomous(disciplinasPendentes, sendResponse) {
   }
 
   sendResponse({ success: true, concluidas: totalConcluidas, total: totalAtividades });
+}
+
+// Helper: Executa uma atividade única em aba temporária
+function executeSingleAutonomous(url, sendResponse) {
+  chrome.tabs.create({ url: url, active: false }, (tab) => {
+    const listener = (tabId, changeInfo) => {
+      if (tabId === tab.id && changeInfo.status === 'complete') {
+        chrome.tabs.onUpdated.removeListener(listener);
+        
+        setTimeout(() => {
+          chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content.js']
+          }, () => {
+            if (chrome.runtime.lastError) {
+              console.error('Script injection failed:', chrome.runtime.lastError.message);
+              chrome.tabs.remove(tab.id);
+              sendResponse({ success: false });
+              return;
+            }
+            
+            chrome.tabs.sendMessage(tab.id, {
+              action: 'AUTOPILOT_EXECUTE',
+              task: 'complete_single'
+            }, (response) => {
+              chrome.tabs.remove(tab.id);
+              sendResponse(response || { success: true });
+            });
+          });
+        }, 1500);
+      }
+    };
+    
+    chrome.tabs.onUpdated.addListener(listener);
+  });
 }

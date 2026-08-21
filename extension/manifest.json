@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "EstudaAI - Conector AVA Anhanguera & Kroton",
-  "version": "1.0.1",
+  "version": "1.0.8",
   "description": "Sincronizador automático de disciplinas, atividades e tutor IA para o Portal Anhanguera, Unopar, Colaborar e AVA KLS.",
   "permissions": [
     "tabs",
@@ -67,6 +67,23 @@
       ],
       "js": ["estudaai-bridge.js"],
       "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["completion-fetch.js"],
+      "matches": [
+        "https://*.avaeduc.com.br/*",
+        "https://*.colaboraread.com.br/*",
+        "https://*.anhanguera.com/*",
+        "https://*.kroton.com.br/*",
+        "https://*.kroton.com/*",
+        "https://*.unopar.com.br/*",
+        "https://*.unopar.br/*",
+        "https://*.pitagoras.com.br/*",
+        "https://*.pitagoras.br/*",
+        "https://*.ampli.me/*"
+      ]
     }
   ]
 }

@@ -18,7 +18,8 @@ export type TipoAtividade =
   | 'aprendizagem' 
   | 'avaliacao_unidade' 
   | 'discursiva' 
-  | 'prova_digital';
+  | 'prova_digital'
+  | 'certificado';
 
 export interface AtividadeDisciplina {
   id: string;
@@ -30,6 +31,7 @@ export interface AtividadeDisciplina {
   prazo?: string;
   pontuacaoMaxima?: number;
   pontuacaoObtida?: number;
+  url?: string;
   linkTexto?: string;
   instrucao?: string;
   questoesDisponiveis?: number;

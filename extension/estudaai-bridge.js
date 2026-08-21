@@ -13,30 +13,59 @@
   // ============================================================
   // 1. INJETAR DADOS DO AVA AO CARREGAR O PAINEL
   // ============================================================
-  chrome.storage.local.get(['estudaai_student', 'estudaai_disciplinas'], (res) => {
-    if (res.estudaai_disciplinas && res.estudaai_disciplinas.length > 0) {
-      try {
-        localStorage.setItem('estudaai_disciplinas', JSON.stringify(res.estudaai_disciplinas));
-        if (res.estudaai_student) {
-          const currentUser = {
-            id: `user-${Date.now()}`,
-            name: res.estudaai_student.name,
-            email: `${res.estudaai_student.name.toLowerCase().replace(/\s+/g, '.')}@aluno.anhanguera.edu.br`,
-            role: 'aluno',
-            avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-            course: 'Direito',
-            semester: 5,
-            studyGoalMinutes: 60,
-            createdAt: new Date().toISOString()
-          };
-          localStorage.setItem('estudaai_current_user', JSON.stringify(currentUser));
-        }
-        window.dispatchEvent(new Event('estudaai_disciplinas_changed'));
-        window.dispatchEvent(new Event('estudaai_auth_changed'));
-        console.log('✅ Dados da extensão injetados no EstudaAI com sucesso!');
-      } catch (e) {
-        console.error('Erro ao injetar dados:', e);
+  function injectFromStorage(res, source) {
+    if (!res.estudaai_disciplinas || res.estudaai_disciplinas.length === 0) {
+      console.warn(`⚠️ EstudaAI Bridge (${source}): storage sem disciplinas ainda.`, res);
+      return false;
+    }
+    try {
+      localStorage.setItem('estudaai_disciplinas', JSON.stringify(res.estudaai_disciplinas));
+      if (res.estudaai_student) {
+        const currentUser = {
+          id: `user-${Date.now()}`,
+          name: res.estudaai_student.name,
+          email: `${res.estudaai_student.name.toLowerCase().replace(/\s+/g, '.')}@aluno.anhanguera.edu.br`,
+          role: 'aluno',
+          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+          course: 'Direito',
+          semester: 5,
+          studyGoalMinutes: 60,
+          createdAt: new Date().toISOString()
+        };
+        localStorage.setItem('estudaai_current_user', JSON.stringify(currentUser));
       }
+      window.dispatchEvent(new Event('estudaai_disciplinas_changed'));
+      window.dispatchEvent(new Event('estudaai_auth_changed'));
+      console.log(`✅ EstudaAI Bridge (${source}): dados injetados com sucesso! (${res.estudaai_disciplinas.length} disciplinas)`);
+      return true;
+    } catch (e) {
+      console.error('Erro ao injetar dados:', e);
+      return false;
+    }
+  }
+
+  // Tenta logo ao carregar; se ainda não houver dado (corrida com o save da extensão),
+  // tenta de novo por alguns segundos e também escuta storage.onChanged.
+  chrome.storage.local.get(['estudaai_student', 'estudaai_disciplinas'], (res) => {
+    if (injectFromStorage(res, 'load')) return;
+
+    let attempts = 0;
+    const retry = setInterval(() => {
+      attempts++;
+      chrome.storage.local.get(['estudaai_student', 'estudaai_disciplinas'], (res2) => {
+        if (injectFromStorage(res2, `retry#${attempts}`) || attempts >= 5) {
+          clearInterval(retry);
+        }
+      });
+    }, 1000);
+  });
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    if (changes.estudaai_disciplinas || changes.estudaai_student) {
+      chrome.storage.local.get(['estudaai_student', 'estudaai_disciplinas'], (res) => {
+        injectFromStorage(res, 'onChanged');
+      });
     }
   });
 

@@ -17,8 +17,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         url.includes('ampli') ||
                         url.includes('moodle');
 
+    const isInsideDiscipline = url.includes('course/view.php');
+
     if (isEduPortal) {
-      statusText.innerHTML = '🟢 <span style="color:#34d399">Portal Acadêmico Detectado</span>';
+      statusText.innerHTML = '🟢 <span style="color:#34d399">Painel Acadêmico Detectado</span>';
     } else {
       statusText.innerHTML = '🟡 <span style="color:#fbbf24">Abra a página do AVA/Portal</span>';
     }

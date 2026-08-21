@@ -199,6 +199,36 @@ export default function DisciplinasPage() {
 
   const handleRunAutoPilotSingleAtividade = (disciplinaId: string, atividadeId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+
+    // Encontra a atividade para pegar a URL
+    const disc = disciplinas.find(d => d.id === disciplinaId);
+    let atividadeUrl = null;
+    let atividadeNome = '';
+    if (disc) {
+      for (const unidade of disc.unidades || []) {
+        const at = unidade.atividades.find(a => a.id === atividadeId);
+        if (at) {
+          atividadeUrl = at.url || at.linkTexto || null;
+          atividadeNome = at.titulo;
+          break;
+        }
+      }
+    }
+
+    if (typeof window !== 'undefined' && atividadeUrl) {
+      // Exibe toast local avisando que a automação começou
+      // (Não precisa de modal para uma única atividade)
+      window.dispatchEvent(new CustomEvent('estudaai_autopilot_command', {
+        detail: { 
+          task: 'complete_single', 
+          disciplinaId, 
+          disciplinaNome: disc?.nome || '',
+          url: atividadeUrl,
+          atividadeId
+        }
+      }));
+    }
+
     const updated = toggleAtividadeConcluida(disciplinaId, atividadeId);
     if (updated) {
       loadData();
@@ -432,6 +462,7 @@ export default function DisciplinasPage() {
       case 'aprendizagem': return <BrainCircuit className="h-4 w-4 text-emerald-500" />;
       case 'avaliacao_unidade': return <Award className="h-4 w-4 text-amber-500" />;
       case 'discursiva': return <FileText className="h-4 w-4 text-red-500" />;
+      case 'certificado': return <Award className="h-4 w-4 text-yellow-500" />;
       default: return <CheckCircle2 className="h-4 w-4 text-surface-400" />;
     }
   };
@@ -444,6 +475,7 @@ export default function DisciplinasPage() {
       case 'avaliacao_unidade': return 'Avaliação da Unidade (AV Oficial)';
       case 'discursiva': return 'Atividade Discursiva / Relatório';
       case 'prova_digital': return 'Prova Digital Institucional';
+      case 'certificado': return 'Certificado de Conclusão';
       default: return 'Atividade';
     }
   };
