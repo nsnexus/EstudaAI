@@ -26,6 +26,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Mostra a última sincronização
+  chrome.storage.local.get(['estudaai_last_sync'], (res) => {
+    const lastSyncEl = document.getElementById('last-sync-text');
+    if (lastSyncEl && res.estudaai_last_sync) {
+      const d = new Date(res.estudaai_last_sync);
+      lastSyncEl.innerHTML = `🗓️ ${d.toLocaleDateString()} às ${d.toLocaleTimeString()}`;
+    }
+  });
+
   // Função auxiliar para enviar mensagem ou injetar content script se necessário
   function sendMsgWithFallback(tabId, message, callback) {
     chrome.tabs.sendMessage(tabId, message, (response) => {
@@ -75,6 +84,11 @@ document.addEventListener('DOMContentLoaded', () => {
             btnSync.disabled = false;
             btnSync.textContent = '✅ Sincronizado com Sucesso!';
             statusText.innerHTML = `🎉 <strong>${response.disciplinas.length} matérias</strong> sincronizadas!`;
+            
+            // Atualiza o campo visualmente na hora
+            const d = new Date();
+            const lastSyncEl = document.getElementById('last-sync-text');
+            if (lastSyncEl) lastSyncEl.innerHTML = `🗓️ ${d.toLocaleDateString()} às ${d.toLocaleTimeString()}`;
           });
         } else {
           btnSync.disabled = false;
