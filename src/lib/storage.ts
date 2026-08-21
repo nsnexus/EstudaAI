@@ -343,8 +343,8 @@ export function syncPortalData(aluno: any, disciplinas: Disciplina[]): void {
       email: aluno.email,
       role: 'aluno',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-      course: aluno.course || 'Direito',
-      semester: aluno.semester || 5,
+      course: aluno.curso || aluno.course || 'Não Identificado',
+      semester: aluno.periodo || aluno.semester || 1,
       studyGoalMinutes: 60,
       createdAt: new Date().toISOString()
     };

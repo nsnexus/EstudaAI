@@ -400,7 +400,7 @@
 
   function getStudentInfo() {
     let name = '';
-    const userTextEl = document.querySelector('.usertext, .userbutton span.avatars, .login-mat-nome, .user-name, .navbar-nav .nav-item .nav-link span');
+    const userTextEl = document.querySelector('.usertext, .userbutton span.avatars, .login-mat-nome, .user-name, .navbar-nav .nav-item .nav-link span, .loginDetalhes span.text-right');
     if (userTextEl && userTextEl.textContent.trim()) {
       name = userTextEl.textContent.trim().split('\n')[0].trim();
     }
@@ -408,6 +408,11 @@
       // Fallback: busca no avatar ou header
       const avatarEl = document.querySelector('.usermenu .userbutton span, .userinitials');
       if (avatarEl) name = (avatarEl.title || avatarEl.textContent.trim()).split('\n')[0].trim();
+    }
+    if (!name) {
+      // Fallback: busca via script interno comum no Colaborar/Unopar
+      const scriptMatch = document.body.innerHTML.match(/var\s+name\s*=\s*['"]([^'"]+)['"]/);
+      if (scriptMatch && scriptMatch[1]) name = scriptMatch[1].trim();
     }
     if (!name) {
       // Fallback: varre a área de cabeçalho procurando um nome em maiúsculas (2+ palavras)
@@ -424,9 +429,25 @@
       }
     }
 
+    // Extrai Curso e Período (comum no Colaborar na tag <select id="matriculaId">)
+    let curso = 'Não identificado';
+    let periodo = 'Não identificado';
+    const selecaoCurso = document.querySelector('select#matriculaId option:checked, select.selecaoSemestre option:checked, .course-title');
+    if (selecaoCurso && selecaoCurso.textContent) {
+      const parts = selecaoCurso.textContent.trim().split('-');
+      if (parts.length >= 2) {
+        curso = parts[0].trim();
+        periodo = parts[1].trim();
+      } else {
+        curso = parts[0].trim();
+      }
+    }
+
     return {
       name: name || 'Estudante',
-      instituicao: window.location.hostname.includes('unopar') ? 'Unopar' :
+      curso: curso,
+      periodo: periodo,
+      instituicao: window.location.hostname.includes('unopar') || window.location.hostname.includes('colaboraread') ? 'Unopar' :
                    window.location.hostname.includes('pitagoras') ? 'Pitagoras' : 'Anhanguera',
       url: window.location.href,
       updatedAt: new Date().toISOString()
