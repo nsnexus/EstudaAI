@@ -1174,8 +1174,13 @@
     document.querySelectorAll('a, button, input[type="button"], input[type="submit"]').forEach(btn => {
       const text = (btn.value || btn.innerText || '').toLowerCase();
       if (text.includes('obtenha seu certificado') || text.includes('imprimir certificado') || text.includes('gerar certificado')) {
+        // Forçar o navegador a fazer o download em vez de só abrir em outra aba
+        if (btn.tagName.toLowerCase() === 'a') {
+          btn.setAttribute('download', 'Certificado.pdf');
+          btn.setAttribute('target', '_blank');
+        }
         btn.click();
-        showToast('📜 Certificado gerado/impresso com sucesso!');
+        showToast('📜 Certificado baixado com sucesso!');
         concluiu = true;
       }
     });
