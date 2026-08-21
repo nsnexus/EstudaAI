@@ -1083,9 +1083,12 @@
     if (window.location.href.includes('/mod/quiz/attempt')) return;
     if (document.getElementById('estudaai-floating-widget')) return;
 
+    const student = getStudentInfo();
+    // Só exibe o widget se o aluno estiver realmente logado (nome identificado)
+    if (student.name === 'Estudante') return;
+
     chrome.storage.local.get(['estudaai_is_logged_in'], (res) => {
       const isLoggedIn = !!res.estudaai_is_logged_in;
-      const student = getStudentInfo();
       const widget = document.createElement('div');
       widget.id = 'estudaai-floating-widget';
       
@@ -1100,7 +1103,8 @@
           </div>
           <div class="estudaai-student-name">${student.name}</div>
           <div class="estudaai-info-text">Sincronize suas disciplinas e atividades com a plataforma EstudaAI em 1 clique.</div>
-          <button id="estudaai-btn-sync-widget" class="estudaai-btn-sync" style="background-color: ${btnColor} !important; border-color: ${btnColor} !important;">${btnText}</button>
+          <button id="estudaai-btn-sync-widget" class="estudaai-btn-sync" style="background-color: ${btnColor} !important; border-color: ${btnColor} !important; margin-bottom: 8px;">${btnText}</button>
+          <a href="https://estudaai.pages.dev" target="_blank" class="estudaai-btn-sync" style="background-color: #1e293b !important; border-color: #1e293b !important; color: white; text-decoration: none; display: flex; justify-content: center; align-items: center; text-align: center;">Abrir Painel EstudaAI</a>
           <div id="estudaai-widget-status" class="estudaai-status-msg" style="display:none;"></div>
         </div>
       `;
