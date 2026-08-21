@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "EstudaAI - Conector AVA Anhanguera & Kroton",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Sincronizador automático de disciplinas, atividades e tutor IA para o Portal Anhanguera, Unopar, Colaborar e AVA KLS.",
   "permissions": [
     "tabs",

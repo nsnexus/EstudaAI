@@ -602,7 +602,110 @@
     }
   }
 
+  async function scrapeColaborarDisciplinas(onProgress = null) {
+    const disciplinasEncontradas = [];
+    const matriculaEl = document.querySelector('select#matriculaId, select.selecaoSemestre');
+    const matriculaId = matriculaEl ? matriculaEl.value : null;
+
+    const blocosCronograma = document.querySelectorAll('.atividadesCronograma');
+    const total = blocosCronograma.length;
+    let curr = 0;
+
+    for (const bloco of blocosCronograma) {
+      curr++;
+      const nomeEl = bloco.querySelector('.atividadeNome');
+      if (!nomeEl) continue;
+      
+      const title = nomeEl.textContent.trim().split('\n')[0].trim();
+      const url = nomeEl.href;
+      
+      const btnMaisDetalhes = bloco.querySelector('.js-active-atividades');
+      const boletimId = btnMaisDetalhes ? btnMaisDetalhes.getAttribute('data-boletim-id') : null;
+      
+      let atividadesMapeadas = [];
+      let atividadesConcluidas = 0;
+      let andamentoGeral = 0;
+
+      if (boletimId && matriculaId) {
+         try {
+            const res = await fetch(`/aluno/dashboard/listAtividades?id=${matriculaId}&boletimId=${boletimId}`);
+            const html = await res.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const linhas = doc.querySelectorAll('.list-line-interna, li');
+            
+            linhas.forEach((li, index) => {
+               const txt = li.textContent.replace(/\s+/g, ' ').trim();
+               if (!txt) return;
+
+               // Tenta achar a data e hora "DD/MM/YY HH:MM à DD/MM/YY HH:MM"
+               const dateMatch = txt.match(/(\d{2}\/\d{2}\/\d{2}\s+\d{2}:\d{2})\s+à\s+(\d{2}\/\d{2}\/\d{2}\s+\d{2}:\d{2})/);
+               let disponivel = true;
+               if (dateMatch) {
+                   const inicioStr = dateMatch[1]; // ex: 01/09/26 19:05
+                   // Converte "01/09/26 19:05" para Date (assumindo ano 2026)
+                   const [dia, mes, anoCurto] = inicioStr.split(' ')[0].split('/');
+                   const [hora, min] = inicioStr.split(' ')[1].split(':');
+                   const dataInicio = new Date(2000 + parseInt(anoCurto), parseInt(mes) - 1, parseInt(dia), parseInt(hora), parseInt(min));
+                   if (new Date() < dataInicio) {
+                       disponivel = false;
+                   }
+               }
+               
+               // Verifica se há ícone de check ou texto "pontos" que indica conclusão
+               const checkIcon = li.querySelector('.fa-check, .icon-check, .text-success, [class*="check"]');
+               let percentualConclusao = 0;
+               if (checkIcon || txt.includes('pontos')) {
+                   percentualConclusao = 100;
+                   atividadesConcluidas++;
+               }
+
+               atividadesMapeadas.push({
+                   id: `colab_${boletimId}_${index}`,
+                   titulo: txt.split(' - ')[0].trim(),
+                   tipo: 'atividade_colaborar',
+                   concluido: percentualConclusao === 100,
+                   percentualConclusao: percentualConclusao,
+                   url: url, // usa URL da disciplina já que é modal/ajax
+                   disponivel: disponivel,
+                   rawText: txt
+               });
+            });
+            
+            if (atividadesMapeadas.length > 0) {
+               andamentoGeral = Math.round((atividadesConcluidas / atividadesMapeadas.length) * 100);
+            }
+         } catch (e) {
+            console.error('Erro ao mapear Colaborar', e);
+         }
+      }
+
+      disciplinasEncontradas.push({
+         nome: title,
+         andamentoGeral: andamentoGeral,
+         moodleCourseId: boletimId,
+         moodleCourseUrl: url,
+         totalAtividades: atividadesMapeadas.length,
+         atividadesConcluidas: atividadesConcluidas,
+         unidades: [{
+             numero: 1,
+             titulo: 'Cronograma',
+             descricao: 'Atividades do Colaborar',
+             andamentoTopico: andamentoGeral,
+             atividades: atividadesMapeadas
+         }],
+         isColaborar: true
+      });
+
+      if (onProgress) onProgress(curr, total, title);
+    }
+    return disciplinasEncontradas;
+  }
+
   async function scrapeDisciplinas(onProgress = null) {
+    if (window.location.hostname.includes('colaboraread') || document.querySelector('select#matriculaId')) {
+       return await scrapeColaborarDisciplinas(onProgress);
+    }
+
     const cursosEncontrados = [];
     const ignoreList = ['INSCREVA-SE', 'Processo Seletivo', 'Painel', 'Página', 'Meus Cursos', 'Todos', 'Sair', 'Menu', 'Suporte', 'Avisos', 'Contatos', 'Início', 'Home', 'Boas Vindas', 'Manual'];
 
@@ -1138,7 +1241,6 @@
         syncBtn.innerText = '🔄 Sincronizando...';
         showSyncModal();
 
-        const studentData = getStudentInfo();
         const discData = await scrapeDisciplinas((curr, total, nome) => {
            updateSyncModal(curr, total, nome);
         });

@@ -896,7 +896,7 @@ export default function DisciplinasPage() {
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {selectedDisciplina.unidades.map((unidade) => {
                 const filteredAtividades = unidade.atividades.filter(
-                  a => !modalPendingOnly || a.status === 'pendente'
+                  a => !modalPendingOnly || (a.status === 'pendente' && a.disponivel !== false)
                 );
 
                 if (filteredAtividades.length === 0 && modalPendingOnly) return null;
@@ -995,6 +995,13 @@ export default function DisciplinasPage() {
                                   </p>
                                 )}
 
+                                {atividade.rawText && (
+                                  <p className="text-[11px] text-surface-400 dark:text-surface-500 mt-1">
+                                    <Clock className="inline-block h-3 w-3 mr-1" />
+                                    {atividade.rawText.split('(Horário de Brasília)')[0] + '(Horário de Brasília)'}
+                                  </p>
+                                )}
+
                                 {atividade.instrucao && (
                                   <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 italic">
                                     {atividade.instrucao}
@@ -1016,7 +1023,7 @@ export default function DisciplinasPage() {
 
                             {/* Right: Actions */}
                             <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                              {!isDone && (
+                              {!isDone && atividade.disponivel !== false && (
                                 <button
                                   onClick={(e) => handleRunAutoPilotSingleAtividade(selectedDisciplina.id, atividade.id, e)}
                                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold border border-emerald-500/30 transition-all"
@@ -1025,6 +1032,15 @@ export default function DisciplinasPage() {
                                   <Zap className="h-3.5 w-3.5 text-amber-500" />
                                   <span>Auto-Completar</span>
                                 </button>
+                              )}
+                              {!isDone && atividade.disponivel === false && (
+                                <div
+                                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-surface-100 dark:bg-surface-800/50 text-surface-400 dark:text-surface-500 text-xs font-bold border border-surface-200 dark:border-surface-700 cursor-not-allowed"
+                                  title="Aguarde o prazo de liberação"
+                                >
+                                  <Lock className="h-3.5 w-3.5" />
+                                  <span>Bloqueado</span>
+                                </div>
                               )}
 
                               {/* Botão de Estudar com IA Socrática */}
