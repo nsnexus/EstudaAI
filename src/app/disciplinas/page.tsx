@@ -527,22 +527,6 @@ export default function DisciplinasPage() {
             <Zap className="h-4 w-4 text-amber-300" />
             <span>Sincronizar com Portal AVA</span>
           </button>
-
-          <div className="flex items-center gap-3 bg-surface-100 dark:bg-surface-900 border border-surface-200 dark:border-surface-800 rounded-2xl p-2.5">
-            <img 
-              src={user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'} 
-              alt="Avatar" 
-              className="h-9 w-9 rounded-xl object-cover ring-2 ring-brand-500/30"
-            />
-            <div>
-              <p className="text-xs font-bold text-surface-900 dark:text-white">
-                {user?.name || 'Narciso Henrique Felizardo'}
-              </p>
-              <p className="text-[11px] text-surface-500 dark:text-surface-400">
-                {totalPendentesGeral > 0 ? `${totalPendentesGeral} pendências para concluir` : '🎉 Tudo em dia!'}
-              </p>
-            </div>
-          </div>
         </div>
       </div>
 

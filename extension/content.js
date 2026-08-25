@@ -651,10 +651,12 @@
                    }
                }
                
-               // Verifica se há ícone de check ou texto "pontos" que indica conclusão
+               // Verifica se há ícone de check indicando conclusão.
+               // Nota: NÃO usar `txt.includes('pontos')` aqui — qualquer linha pendente que só
+               // mostre "0 pontos" ou "Pontuação: X" também bate nisso e vira falso positivo.
                const checkIcon = li.querySelector('.fa-check, .icon-check, .text-success, [class*="check"]');
                let percentualConclusao = 0;
-               if (checkIcon || txt.includes('pontos')) {
+               if (checkIcon) {
                    percentualConclusao = 100;
                    atividadesConcluidas++;
                }
