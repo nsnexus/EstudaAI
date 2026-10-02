@@ -1189,8 +1189,6 @@
     if (document.getElementById('estudaai-floating-widget')) return;
 
     const student = getStudentInfo();
-    // Só exibe o widget se o aluno estiver realmente logado (nome identificado)
-    if (student.name === 'Estudante') return;
 
     chrome.storage.local.get(['estudaai_is_logged_in', 'estudaai_user_name'], (res) => {
       const isLoggedIn = !!res.estudaai_is_logged_in;
@@ -1206,7 +1204,7 @@
             <span class="estudaai-badge">🎓 EstudaAI Conector</span>
             <button id="estudaai-close-widget" title="Fechar">✕</button>
           </div>
-          <div class="estudaai-student-name">${student.name}</div>
+          <div class="estudaai-student-name">${student.name || 'Estudante'}</div>
           <div class="estudaai-info-text">Sincronize suas disciplinas e atividades com a plataforma EstudaAI em 1 clique.</div>
           <button id="estudaai-btn-sync-widget" class="estudaai-btn-sync" style="background-color: ${btnColor} !important; border-color: ${btnColor} !important; margin-bottom: 8px;">${btnText}</button>
           <a href="https://estudaai.pages.dev" target="_blank" class="estudaai-btn-sync" style="background-color: #1e293b !important; border-color: #1e293b !important; color: white; text-decoration: none; display: flex; justify-content: center; align-items: center; text-align: center;">Abrir Painel EstudaAI</a>
@@ -1480,8 +1478,9 @@
            const portalFirst = portalName.split(' ')[0];
            const estudaaiFirst = estudaaiName.split(' ')[0];
            if (portalFirst !== estudaaiFirst) {
-               alert('⚠️ Segurança EstudaAI\n\nO aluno logado no EstudaAI (' + (res.estudaai_user_name || 'Desconhecido') + ') é diferente do aluno logado no AVA (' + studentData.name + ').\n\nO Auto-Pilot foi CANCELADO para evitar que atividades sejam feitas na conta de terceiros.');
-               sendResponse({ success: false, error: 'Conta do AVA incompatível com a do EstudaAI.' });
+               console.warn('⚠️ Segurança EstudaAI: Aluno logado no EstudaAI (' + (res.estudaai_user_name || 'Desconhecido') + ') diverge do AVA (' + studentData.name + ').');
+               showToast('⚠️ Aluno no EstudaAI diverge do AVA (' + studentData.name + '). Cancelando Auto-Pilot por segurança.', 6000);
+               sendResponse({ success: false, error: 'Conta do AVA (' + studentData.name + ') incompatível com a do EstudaAI (' + (res.estudaai_user_name || 'Desconhecido') + ').' });
                return;
            }
         }
@@ -1507,9 +1506,13 @@
   // 6. MELHORIAS (Cache, Login, Termos) E AUTO-EXECUÇÃO
   // ============================================================
   function detectLoginOrError() {
-    // Tela de login ou expirada
+    // Tela de login ou expirada (só considera input se for visível)
+    const pwdInput = document.querySelector('input[type="password"]');
+    const isPwdVisible = pwdInput && (pwdInput.offsetParent !== null && window.getComputedStyle(pwdInput).display !== 'none');
     const bodyText = document.body.innerText || '';
-    if (document.querySelector('input[type="password"]') || window.location.hostname.includes('login.') || bodyText.includes('Sessão expirada') || bodyText.includes('Você não está logado')) {
+    if ((isPwdVisible && (window.location.hostname.includes('login.') || window.location.pathname.includes('login') || window.location.pathname.includes('auth'))) || 
+        bodyText.includes('Sessão expirada') || 
+        bodyText.includes('Você não está logado')) {
       showToast('⚠️ Sessão expirada ou Tela de Login detectada. Automação pausada.', 10000);
       return true;
     }

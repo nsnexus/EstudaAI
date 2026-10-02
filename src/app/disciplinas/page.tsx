@@ -126,31 +126,36 @@ export default function DisciplinasPage() {
     setAutoPilotRunning(true);
     setAutoPilotSuccess(false);
     setAutoPilotStep(1);
-    setAutoPilotStepText('1. Conectando extensão ao AVA KLS...');
-
     clearAutoPilotTimeouts();
+
+    if (!disciplina.moodleCourseUrl) {
+      setAutoPilotStepText('⚠️ Esta disciplina não possui link do portal AVA. Sincronize suas matérias pelo portal primeiro.');
+      setAutoPilotRunning(false);
+      return;
+    }
+
+    setAutoPilotStepText('1. Conectando extensão ao AVA KLS...');
 
     // Dispara o comando REAL para a extensão executar no AVA
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('estudaai_autopilot_command', {
-        detail: {
-          task: 'complete_discipline',
-          disciplinaId: disciplina.id,
-          disciplinaNome: disciplina.nome,
-          url: disciplina.moodleCourseUrl
-        }
-      }));
+      let isCompleted = false;
 
-      // Escuta confirmação de execução da extensão
-      const onError = (ev: Event) => {
-        const err = (ev as CustomEvent).detail?.error;
-        setAutoPilotStepText(`⚠️ ${err || 'Erro ao conectar com o AVA. Abra o portal primeiro.'}`);
-        setAutoPilotRunning(false);
+      const cleanup = () => {
+        isCompleted = true;
         clearAutoPilotTimeouts();
         window.removeEventListener('estudaai_autopilot_error', onError);
         window.removeEventListener('estudaai_autopilot_done', onDone);
       };
+
+      const onError = (ev: Event) => {
+        cleanup();
+        const err = (ev as CustomEvent).detail?.error;
+        setAutoPilotStepText(`⚠️ ${err || 'Erro ao conectar com o AVA. Abra o portal primeiro.'}`);
+        setAutoPilotRunning(false);
+      };
+
       const onDone = (ev: Event) => {
+        cleanup();
         const { concluidas, total } = (ev as CustomEvent).detail || {};
         concluirTodaDisciplina(disciplina.id);
         loadData();
@@ -159,33 +164,44 @@ export default function DisciplinasPage() {
         setAutoPilotStepText(`🎉 ${concluidas || ''}/${total || ''} atividades concluídas no AVA para "${disciplina.nome}"!`);
         setAutoPilotRunning(false);
         setAutoPilotSuccess(true);
-        clearAutoPilotTimeouts();
-        window.removeEventListener('estudaai_autopilot_error', onError);
-        window.removeEventListener('estudaai_autopilot_done', onDone);
       };
+
       window.addEventListener('estudaai_autopilot_error', onError, { once: true });
       window.addEventListener('estudaai_autopilot_done', onDone, { once: true });
+
+      // Safety timeout: se a extensão ou portal não responder em 15s
+      const timeoutId = setTimeout(() => {
+        if (!isCompleted) {
+          cleanup();
+          setAutoPilotStepText('⚠️ Tempo esgotado: A extensão EstudaAI não respondeu. Verifique se a extensão está instalada/ativa e a aba do AVA está aberta.');
+          setAutoPilotRunning(false);
+        }
+      }, 15000);
+      autoPilotTimeouts.current.push(timeoutId);
+
+      window.dispatchEvent(new CustomEvent('estudaai_autopilot_command', {
+        detail: {
+          task: 'complete_discipline',
+          disciplinaId: disciplina.id,
+          disciplinaNome: disciplina.nome,
+          url: disciplina.moodleCourseUrl
+        }
+      }));
     }
 
     // Atualiza o modal com progresso visual enquanto executa
     autoPilotTimeouts.current.push(setTimeout(() => {
-      if (autoPilotRunning) {
-        setAutoPilotStep(2);
-        setAutoPilotStepText('2. Resolvendo questionários AAP e AVs com IA...');
-      }
-    }, 600));
+      setAutoPilotStep(2);
+      setAutoPilotStepText('2. Resolvendo questionários AAP e AVs com IA...');
+    }, 1000));
     autoPilotTimeouts.current.push(setTimeout(() => {
-      if (autoPilotRunning) {
-        setAutoPilotStep(3);
-        setAutoPilotStepText('3. Concluindo Webaulas Interativas e SCORM via API Moodle...');
-      }
-    }, 1200));
+      setAutoPilotStep(3);
+      setAutoPilotStepText('3. Concluindo Webaulas Interativas e SCORM via API Moodle...');
+    }, 2200));
     autoPilotTimeouts.current.push(setTimeout(() => {
-      if (autoPilotRunning) {
-        setAutoPilotStep(4);
-        setAutoPilotStepText('4. Computando presença em Teleaulas e Livros Didáticos...');
-      }
-    }, 1800));
+      setAutoPilotStep(4);
+      setAutoPilotStepText('4. Computando presença em Teleaulas e Livros Didáticos...');
+    }, 3600));
   };
 
   const handleRunAutoPilotUnidade = (disciplinaId: string, unidadeNumero: number, e?: React.MouseEvent) => {
@@ -242,28 +258,48 @@ export default function DisciplinasPage() {
     setAutoPilotRunning(true);
     setAutoPilotSuccess(false);
     setAutoPilotStep(1);
-    setAutoPilotStepText('1. Mapeando fila de todas as matérias pendentes...');
-
     clearAutoPilotTimeouts();
 
     const disciplinasPendentes = disciplinas
       .filter(d => d.andamentoGeral < 100)
       .map(d => ({ id: d.id, nome: d.nome, url: d.moodleCourseUrl }));
 
+    if (disciplinasPendentes.length === 0) {
+      setAutoPilotStepText('🎉 Todas as disciplinas já estão 100% concluídas!');
+      setAutoPilotRunning(false);
+      setAutoPilotSuccess(true);
+      return;
+    }
+
+    const hasAnyRealUrl = disciplinasPendentes.some(d => !!d.url);
+    if (!hasAnyRealUrl) {
+      setAutoPilotStepText('⚠️ Disciplinas ainda não sincronizadas com o portal AVA. Acesse a aba do portal da sua faculdade e use a extensão para sincronizar primeiro.');
+      setAutoPilotRunning(false);
+      return;
+    }
+
+    setAutoPilotStepText('1. Mapeando fila de todas as matérias pendentes...');
+
     // Dispara o comando REAL para o AVA via extensão
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('estudaai_autopilot_command', {
-        detail: { task: 'complete_all', disciplinaId: null, disciplinaNome: 'Todas as Disciplinas', disciplinasPendentes }
-      }));
+      let isCompleted = false;
+
+      const cleanup = () => {
+        isCompleted = true;
+        clearAutoPilotTimeouts();
+        window.removeEventListener('estudaai_autopilot_error', onError);
+        window.removeEventListener('estudaai_autopilot_done', onDone);
+      };
 
       const onError = (ev: Event) => {
+        cleanup();
         const err = (ev as CustomEvent).detail?.error;
         setAutoPilotStepText(`⚠️ ${err || 'Erro ao conectar com o AVA. Abra o portal primeiro.'}`);
         setAutoPilotRunning(false);
-        clearAutoPilotTimeouts();
-        window.removeEventListener('estudaai_autopilot_error', onError);
       };
+
       const onDone = (ev: Event) => {
+        cleanup();
         concluirTodasDisciplinas();
         loadData();
         triggerConfetti();
@@ -271,31 +307,38 @@ export default function DisciplinasPage() {
         setAutoPilotStepText('🎉 Todas as disciplinas do semestre estão 100% concluídas no AVA!');
         setAutoPilotRunning(false);
         setAutoPilotSuccess(true);
-        clearAutoPilotTimeouts();
-        window.removeEventListener('estudaai_autopilot_error', onError);
       };
+
       window.addEventListener('estudaai_autopilot_error', onError, { once: true });
       window.addEventListener('estudaai_autopilot_done', onDone, { once: true });
+
+      // Safety timeout: se a extensão ou portal não responder em 15s
+      const timeoutId = setTimeout(() => {
+        if (!isCompleted) {
+          cleanup();
+          setAutoPilotStepText('⚠️ Tempo esgotado: A extensão EstudaAI não respondeu. Certifique-se de que a extensão está instalada/ativa no navegador e a aba do AVA está aberta.');
+          setAutoPilotRunning(false);
+        }
+      }, 15000);
+      autoPilotTimeouts.current.push(timeoutId);
+
+      window.dispatchEvent(new CustomEvent('estudaai_autopilot_command', {
+        detail: { task: 'complete_all', disciplinaId: null, disciplinaNome: 'Todas as Disciplinas', disciplinasPendentes }
+      }));
     }
 
     autoPilotTimeouts.current.push(setTimeout(() => {
-      if (autoPilotRunning) {
-        setAutoPilotStep(2);
-        setAutoPilotStepText('2. Processando lote de questionários e simulados com IA...');
-      }
-    }, 800));
+      setAutoPilotStep(2);
+      setAutoPilotStepText('2. Processando lote de questionários e simulados com IA...');
+    }, 1200));
     autoPilotTimeouts.current.push(setTimeout(() => {
-      if (autoPilotRunning) {
-        setAutoPilotStep(3);
-        setAutoPilotStepText('3. Enviando status 100% para Webaulas, SCORM e Teleaulas via API Moodle...');
-      }
-    }, 1600));
+      setAutoPilotStep(3);
+      setAutoPilotStepText('3. Enviando status 100% para Webaulas, SCORM e Teleaulas via API Moodle...');
+    }, 2500));
     autoPilotTimeouts.current.push(setTimeout(() => {
-      if (autoPilotRunning) {
-        setAutoPilotStep(4);
-        setAutoPilotStepText('4. Aguardando confirmação do AVA KLS...');
-      }
-    }, 2400));
+      setAutoPilotStep(4);
+      setAutoPilotStepText('4. Aguardando confirmação do AVA KLS...');
+    }, 4000));
   };
 
   const loadData = () => {
@@ -1179,14 +1222,17 @@ export default function DisciplinasPage() {
                 </div>
               </div>
 
-              {!autoPilotRunning && (
-                <button
-                  onClick={() => setAutoPilotModalOpen(false)}
-                  className="h-8 w-8 rounded-full flex items-center justify-center text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  clearAutoPilotTimeouts();
+                  setAutoPilotRunning(false);
+                  setAutoPilotModalOpen(false);
+                }}
+                className="h-8 w-8 rounded-full flex items-center justify-center text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
+                title="Fechar"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
 
             {/* Target Discipline Name */}
@@ -1238,7 +1284,7 @@ export default function DisciplinasPage() {
               </div>
             </div>
 
-            {/* Footer Action Button */}
+            {/* Footer Action Buttons */}
             {autoPilotSuccess && (
               <button
                 type="button"
@@ -1247,6 +1293,30 @@ export default function DisciplinasPage() {
               >
                 <CheckCircle2 className="h-4 w-4" />
                 <span>Excelente! Concluir e Visualizar</span>
+              </button>
+            )}
+
+            {autoPilotRunning && (
+              <button
+                type="button"
+                onClick={() => {
+                  clearAutoPilotTimeouts();
+                  setAutoPilotRunning(false);
+                  setAutoPilotStepText('Processo interrompido pelo usuário.');
+                }}
+                className="w-full py-2.5 rounded-xl border border-surface-300 dark:border-surface-700 text-xs font-semibold text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+              >
+                Cancelar Automação
+              </button>
+            )}
+
+            {!autoPilotRunning && !autoPilotSuccess && (
+              <button
+                type="button"
+                onClick={() => setAutoPilotModalOpen(false)}
+                className="w-full py-3 rounded-2xl bg-surface-200 dark:bg-surface-800 hover:bg-surface-300 dark:hover:bg-surface-700 text-surface-800 dark:text-surface-200 text-xs font-bold transition-all"
+              >
+                Fechar Janela
               </button>
             )}
           </div>

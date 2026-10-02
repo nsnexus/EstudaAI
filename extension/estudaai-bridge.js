@@ -9,6 +9,12 @@
 
 (function () {
   console.log('🔗 EstudaAI Bridge conectado à plataforma!');
+  if (typeof document !== 'undefined' && document.documentElement) {
+    document.documentElement.dataset.estudaaiExtension = 'true';
+  }
+  window.addEventListener('estudaai_ping', () => {
+    window.dispatchEvent(new CustomEvent('estudaai_pong', { detail: { version: '1.0.9' } }));
+  });
 
   // ============================================================
   // 1. INJETAR DADOS DO AVA AO CARREGAR O PAINEL

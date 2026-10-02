@@ -97,9 +97,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         'https://*.avaeduc.com.br/*',
         'https://*.colaboraread.com.br/*',
         'https://*.anhanguera.com/*',
+        'https://*.anhanguera.com.br/*',
+        'https://*.anhanguera.edu.br/*',
+        'https://*.anhanguera.br/*',
         'https://*.kroton.com.br/*',
+        'https://*.kroton.com/*',
+        'https://*.kroton.edu.br/*',
         'https://*.unopar.com.br/*',
-        'https://*.pitagoras.com.br/*'
+        'https://*.unopar.br/*',
+        'https://*.unopar.edu.br/*',
+        'https://*.pitagoras.com.br/*',
+        'https://*.pitagoras.br/*',
+        'https://*.pitagoras.edu.br/*',
+        'https://*.ampli.me/*'
       ]
     }, (tabs) => {
       if (!tabs || tabs.length === 0) {
